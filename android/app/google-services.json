@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "421097076698",
+    "project_id": "uborrow-184e9",
+    "storage_bucket": "uborrow-184e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:421097076698:android:51dcf8a0bc76f41c6432e3",
+        "android_client_info": {
+          "package_name": "com.example.uborrow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4wNJdZ-sG9Dlu75TFzYVQrr1FxT4ceQg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
