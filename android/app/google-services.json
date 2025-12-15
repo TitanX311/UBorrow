@@ -12,7 +12,20 @@
           "package_name": "com.example.uborrow"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "421097076698-brafrf3m0lhnvkkek9gsljn7psp3pf4o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.uborrow",
+            "certificate_hash": "1dc14c7bb16e3d8df34ea16fd7b44ed115438c6e"
+          }
+        },
+        {
+          "client_id": "421097076698-9hffoi93064fnvb4o1q0s2g3dpsn0m0g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA4wNJdZ-sG9Dlu75TFzYVQrr1FxT4ceQg"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "421097076698-9hffoi93064fnvb4o1q0s2g3dpsn0m0g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "421097076698-c7jnhf8aarjrlhngtkhmq7a7ijvksueb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.uborrow"
+              }
+            }
+          ]
         }
       }
     }

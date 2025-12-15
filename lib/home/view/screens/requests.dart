@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../viewmodel/requests_viewmodel.dart';
 
-class RequestsScreen extends StatelessWidget {
-  final requests = [
-    {"item": "Calculator", "from": "Amit", "status": "Pending"},
-    {"item": "Helmet", "from": "You", "status": "Accepted"},
-  ];
-
-  RequestsScreen({super.key});
+class RequestsScreen extends ConsumerWidget {
+  const RequestsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requests = ref.watch(requestsViewModelProvider);
+    final requestsViewModel = ref.read(requestsViewModelProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(title: Text("Borrow Requests")),
       body: ListView.builder(
@@ -18,16 +18,26 @@ class RequestsScreen extends StatelessWidget {
           final r = requests[i];
           return Card(
             child: ListTile(
-              title: Text(r["item"]!),
-              subtitle: Text("From: ${r["from"]} • Status: ${r["status"]}"),
-              trailing: r["status"] == "Pending"
+              title: Text(r.item),
+              subtitle: Text("From: ${r.from} • Status: ${r.status}"),
+              trailing: r.status == "Pending"
                   ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(icon: Icon(Icons.check), onPressed: () {}),
-                  IconButton(icon: Icon(Icons.close), onPressed: () {}),
-                ],
-              )
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.check),
+                          onPressed: () {
+                            requestsViewModel.acceptRequest(r.id);
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close),
+                          onPressed: () {
+                            requestsViewModel.declineRequest(r.id);
+                          },
+                        ),
+                      ],
+                    )
                   : null,
             ),
           );

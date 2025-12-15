@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../auth/viewmodel/auth_viewmodel.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   final user = {
     "name": "Abir Debnath",
     "year": "1st Year",
@@ -11,7 +13,10 @@ class ProfileScreen extends StatelessWidget {
   ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authViewModelProvider);
+    final authViewModel = ref.read(authViewModelProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(title: Text("Profile")),
       body: Padding(
@@ -20,14 +25,17 @@ class ProfileScreen extends StatelessWidget {
           children: [
             CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)),
             SizedBox(height: 15),
-            Text("${user["name"]}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Text("${user["year"]} • ${user["hostel"]}"),
+            Text(authState.user?.displayName ?? "${user["name"]}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(authState.user?.email ?? "${user["year"]} • ${user["hostel"]}"),
             SizedBox(height: 10),
             Text("Rating: ⭐ ${user["rating"]}", style: TextStyle(fontSize: 18)),
             SizedBox(height: 30),
             ElevatedButton(
               child: Text("Logout"),
-              onPressed: () {},
+              onPressed: () async {
+                 await authViewModel.signOut();
+                 Navigator.pushNamedAndRemoveUntil(context, "/authScreen", (route) => false);
+              },
             )
           ],
         ),

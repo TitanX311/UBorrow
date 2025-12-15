@@ -1,85 +1,124 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../widgets/google_button.dart';
-
-class SignupScreen extends StatelessWidget {
-  final nameCtrl = TextEditingController();
-  final emailCtrl = TextEditingController();
-  final passCtrl = TextEditingController();
-
-  SignupScreen({super.key});
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
 
   @override
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends ConsumerState<SignupScreen> {
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: InputDecoration(
-              labelText: "Full Name",
-              border: OutlineInputBorder(),
+    return Column(
+      children: [
+        const Text(
+          "Name",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white),
+          ),
+          child: TextFormField(
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              suffixIcon: Icon(Icons.mail, color: Color(0xff4ac8f4)),
+              fillColor: Colors.white,
+              border: InputBorder.none,
             ),
           ),
-
-          SizedBox(height: 15),
-
-          TextField(
-            controller: emailCtrl,
-            decoration: InputDecoration(
-              labelText: "Email (College Preferred)",
-              border: OutlineInputBorder(),
+        ),
+        const Text(
+          "Email",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white),
+          ),
+          child: TextFormField(
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              suffixIcon: Icon(Icons.mail, color: Color(0xff4ac8f4)),
+              fillColor: Colors.white,
+              border: InputBorder.none,
             ),
           ),
-
-          SizedBox(height: 15),
-
-          TextField(
-            controller: passCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: "Password",
-              border: OutlineInputBorder(),
+        ),
+        // const Spacer(),
+        const SizedBox(height: 10),
+        const Text(
+          "Password",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white),
+          ),
+          child: TextFormField(
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              suffixIcon: Icon(Icons.lock, color: Color(0xff4ac8f4)),
+              fillColor: Colors.white,
+              border: InputBorder.none,
             ),
           ),
-
-          SizedBox(height: 20),
-
-          ElevatedButton(
-            onPressed: () {},
-            child: Text("Create Account"),
+        ),
+        const Spacer(flex: 2,),
+        Container(
+          height: 40,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xff5bdeac),
+            borderRadius: BorderRadius.circular(30),
           ),
-
-          SizedBox(height: 20),
-          Text("or"),
-          SizedBox(height: 10),
-
-          GoogleButton(
-            onpressed: (){
-              StreamBuilder<User?>(
-                stream: FirebaseAuth.instance.authStateChanges(),
-                builder: (BuildContext context, AsyncSnapshot<User?> snapshot) {
-                  if (snapshot.hasError) {
-                    return const Text('Something went wrong');
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Text("Loading...");
-                  }
-
-                  if (!snapshot.hasData) {
-                    return const SignInScreen();
-                  }
-
-                  final user = snapshot.data!;
-                  return HomeScreen(userId: user.uid);
-                },
-              );
-            },
+          alignment: Alignment.center,
+          child: const Text(
+            "Log In",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Colors.white,
+            ),
           ),
-        ],
-      ),
+        ),
+        const Spacer(),
+        const Center(
+          child: Text(
+            "Don't have a account REGISTER",
+            style: TextStyle(color: Color(0xff1576fc)),
+          ),
+        ),
+      ],
     );
   }
 }

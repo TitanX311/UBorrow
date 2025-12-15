@@ -1,37 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uborrow/home/view/screens/requests.dart';
+import 'package:uborrow/home/viewmodel/home_viewmodel.dart';
 import '../../../home/view/widgets/item_card.dart';
 
-class HomeScreen extends StatelessWidget {
-  final items = [
-    {
-      "name": "Charger",
-      "hostel": "Hall 3 - 219",
-      "image": "https://i.imgur.com/QCNbOAo.png",
-    },
-    {
-      "name": "Extension Board",
-      "hostel": "Hall 2 - 105",
-      "image": "https://i.imgur.com/aY8dFoa.png",
-    },
-    {
-      "name": "Calculator",
-      "hostel": "Hall 1 - 310",
-      "image": "https://i.imgur.com/BS9xMTn.png",
-    },
-  ];
-
+class HomeScreen extends ConsumerWidget {
   HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(homeViewModelProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Borrow Items"),
         actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () => Navigator.pushNamed(context, "/add"),
-          ),
           IconButton(
             icon: Icon(Icons.person),
             onPressed: () => Navigator.pushNamed(context, "/profile"),
@@ -60,12 +44,21 @@ class HomeScreen extends StatelessWidget {
                 children: items
                     .map(
                       (item) => ItemCard(
-                        item: item,
+                        item: {
+                          'name': item.name,
+                          'hostel': item.hostel,
+                          'image': item.image,
+                        },
                         onTap: () {
                           Navigator.pushNamed(
                             context,
                             "/item",
-                            arguments: item,
+                            arguments: {
+                              'name': item.name,
+                              'hostel': item.hostel,
+                              'image': item.image,
+                              'description': item.description,
+                            },
                           );
                         },
                       ),
@@ -75,6 +68,35 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      floatingActionButtonLocation: ExpandableFab.location,
+      floatingActionButton: ExpandableFab(
+          openButtonBuilder: RotateFloatingActionButtonBuilder(
+            child: const Icon(Icons.add),
+          ),
+          children: [
+        FloatingActionButton(
+          // shape: const CircleBorder(),
+          heroTag: null,
+          child: const Text("Request"),
+          onPressed: () => Navigator.pushNamed(context, "/requests"),
+        ),
+        FloatingActionButton(
+          // shape: const CircleBorder(),
+          heroTag: null,
+          child: const Text("Add"),
+          onPressed: () => Navigator.pushNamed(context, "/add"),
+        ),
+      ]),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Courses'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.contact_mail),
+            label: 'Mail',
+          ),
+        ],
       ),
     );
   }

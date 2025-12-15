@@ -1,5 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uborrow/auth/view/screens/auth_screen.dart';
+import 'package:uborrow/theme/app_theme.dart';
+import 'package:uborrow/utils/constants.dart';
 import 'home/view/screens/add_item.dart';
 import 'home/view/screens/chat.dart';
 import 'home/view/screens/home.dart';
@@ -8,12 +12,10 @@ import 'home/view/screens/profile.dart';
 import 'home/view/screens/requests.dart';
 import 'firebase_options.dart';
 
-import 'package:flutter/material.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(BorrowHubApp());
+  runApp(ProviderScope(child: BorrowHubApp()));
 }
 
 class BorrowHubApp extends StatelessWidget {
@@ -22,8 +24,9 @@ class BorrowHubApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Campus Borrow Hub",
-      theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
+      title: AppConstants.appName,
+      theme: AppTheme.lightTheme,
+      debugShowCheckedModeBanner: false,
       initialRoute: "/authScreen",
       routes: {
         "/authScreen": (BuildContext context) => AuthScreen(),
