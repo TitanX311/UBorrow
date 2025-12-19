@@ -1,47 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:uborrow/home/model/item_model.dart';
+import 'package:uborrow/home/view/screens/add_item.dart';
 import 'package:uborrow/home/view/screens/requests.dart';
-import 'package:uborrow/home/viewmodel/home_viewmodel.dart';
-import '../../../home/view/widgets/item_card.dart';
+import 'package:uborrow/home/view/widgets/item_card.dart';
+import 'package:uborrow/home/view/widgets/my_nested_scroll_view.dart';
+import 'package:uborrow/home/view/widgets/notification_button.dart';
+import 'package:uborrow/theme/app_colors.dart';
 
-class HomeScreen extends ConsumerWidget {
-  HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(homeViewModelProvider);
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Borrow Items"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.person),
-            onPressed: () => Navigator.pushNamed(context, "/profile"),
-          ),
-        ],
+class _HomeScreenState extends State<HomeScreen> {
+  int _notificationCount = 0;
+  final List<ItemModel> _items = [
+    ItemModel(
+      id: '1',
+      name: "Charger",
+      hostel: "Hall 3 - 219",
+      image: "https://i.imgur.com/QCNbOAo.png",
+    ),
+    ItemModel(
+      id: '2',
+      name: "Extension Board",
+      hostel: "Hall 2 - 105",
+      image: "https://i.imgur.com/aY8dFoa.png",
+    ),
+    ItemModel(
+      id: '3',
+      name: "Calculator",
+      hostel: "Hall 1 - 310",
+      image: "https://i.imgur.com/BS9xMTn.png",
+    ),
+  ];
+
+  void _incrementCount() {
+    setState(() {
+      _notificationCount++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MyNestedScrollView(
+      title: Text(
+        "uBorrow",
+        style: GoogleFonts.pacifico(
+          textStyle: const TextStyle(color: AppColors.blue),
+        ),
       ),
-
+      actions: [
+        NotificationButton(
+          onPressed: _incrementCount,
+          notificationCount: _notificationCount,
+        ),
+      ],
       body: Padding(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Column(
           children: [
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Search charger, calculator...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            SizedBox(height: 10),
-
-            Expanded(
+            Flexible(
               child: GridView.count(
                 crossAxisCount: 2,
                 childAspectRatio: 0.8,
-                children: items
+                children: _items
                     .map(
                       (item) => ItemCard(
                         item: {
@@ -50,8 +77,10 @@ class HomeScreen extends ConsumerWidget {
                           'image': item.image,
                         },
                         onTap: () {
-                          Navigator.pushNamed(
+                          Navigator.of(
                             context,
+                            rootNavigator: true,
+                          ).pushNamed(
                             "/item",
                             arguments: {
                               'name': item.name,
@@ -71,30 +100,25 @@ class HomeScreen extends ConsumerWidget {
       ),
       floatingActionButtonLocation: ExpandableFab.location,
       floatingActionButton: ExpandableFab(
-          openButtonBuilder: RotateFloatingActionButtonBuilder(
-            child: const Icon(Icons.add),
+        openButtonBuilder: RotateFloatingActionButtonBuilder(
+          child: const Icon(Icons.add),
+        ),
+        children: [
+          FloatingActionButton(
+            // shape: const CircleBorder(),
+            heroTag: null,
+            child: const Icon(Icons.handshake_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (context) => const RequestsScreen())),
           ),
-          children: [
-        FloatingActionButton(
-          // shape: const CircleBorder(),
-          heroTag: null,
-          child: const Text("Request"),
-          onPressed: () => Navigator.pushNamed(context, "/requests"),
-        ),
-        FloatingActionButton(
-          // shape: const CircleBorder(),
-          heroTag: null,
-          child: const Text("Add"),
-          onPressed: () => Navigator.pushNamed(context, "/add"),
-        ),
-      ]),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Courses'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.contact_mail),
-            label: 'Mail',
+          FloatingActionButton(
+            // shape: const CircleBorder(),
+            heroTag: null,
+            child: const Icon(Icons.add),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (context) => AddItemScreen())),
           ),
         ],
       ),

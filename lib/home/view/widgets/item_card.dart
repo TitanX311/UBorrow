@@ -16,7 +16,8 @@ class ItemCard extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: Image.network(item["image"], fit: BoxFit.cover),
+              // child: Image.network(item["image"], fit: BoxFit.cover),
+              child: Placeholder(),
             ),
             SizedBox(height: 6),
             Text(item["name"], style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

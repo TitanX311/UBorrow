@@ -1,24 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uborrow/auth/viewmodel/auth_service.dart';
 
-class SignupScreen extends ConsumerStatefulWidget {
+class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  ConsumerState<SignupScreen> createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends ConsumerState<SignupScreen> {
+class _SignupScreenState extends State<SignupScreen> {
+
+  final emailCtrl = TextEditingController();
+  final passCtrl = TextEditingController();
+  final nameCtrl = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Text(
-          "Name",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: Colors.white,
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            "Name",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Colors.white,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -31,6 +39,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             border: Border.all(color: Colors.white),
           ),
           child: TextFormField(
+            controller: nameCtrl,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
               suffixIcon: Icon(Icons.mail, color: Color(0xff4ac8f4)),
@@ -39,12 +48,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ),
         ),
-        const Text(
-          "Email",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: Colors.white,
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: const Text(
+            "Email",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Colors.white,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -57,6 +70,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             border: Border.all(color: Colors.white),
           ),
           child: TextFormField(
+            controller: emailCtrl,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
               suffixIcon: Icon(Icons.mail, color: Color(0xff4ac8f4)),
@@ -67,12 +81,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ),
         // const Spacer(),
         const SizedBox(height: 10),
-        const Text(
-          "Password",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: Colors.white,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: const Text(
+            "Password",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Colors.white,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -85,6 +102,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             border: Border.all(color: Colors.white),
           ),
           child: TextFormField(
+            controller: passCtrl,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
               suffixIcon: Icon(Icons.lock, color: Color(0xff4ac8f4)),
@@ -94,31 +112,50 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           ),
         ),
         const Spacer(flex: 2,),
-        Container(
-          height: 40,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xff5bdeac),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            "Log In",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Colors.white,
+        GestureDetector(
+          onTap: () async {
+register();
+          },
+          child: Container(
+            height: 40,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xff5bdeac),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              "Register",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
         const Spacer(),
         const Center(
           child: Text(
-            "Don't have a account REGISTER",
+            "Already a user? LOGIN",
             style: TextStyle(color: Color(0xff1576fc)),
           ),
         ),
       ],
     );
+  }
+
+  void register() {
+    final authService = AuthService();
+    try{
+      authService.signupWithEmail(emailCtrl.text, passCtrl.text);
+    } catch (e){
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          )
+      );
+    }
   }
 }

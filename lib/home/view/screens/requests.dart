@@ -1,21 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../viewmodel/requests_viewmodel.dart';
+import 'package:uborrow/home/model/request_model.dart';
 
-class RequestsScreen extends ConsumerWidget {
+class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final requests = ref.watch(requestsViewModelProvider);
-    final requestsViewModel = ref.read(requestsViewModelProvider.notifier);
+  State<RequestsScreen> createState() => _RequestsScreenState();
+}
 
+class _RequestsScreenState extends State<RequestsScreen> {
+  final List<RequestModel> _requests = [
+    RequestModel(id: '1', item: "Calculator", from: "Amit", status: "Pending"),
+    RequestModel(id: '2', item: "Helmet", from: "You", status: "Accepted"),
+  ];
+
+  // void _acceptRequest(String id) {
+  //   setState(() {
+  //     _requests.firstWhere((r) => r.id == id).status = "Accepted";
+  //   });
+  // }
+  //
+  // void _declineRequest(String id) {
+  //   setState(() {
+  //     _requests.removeWhere((r) => r.id == id);
+  //   });
+  // }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Borrow Requests")),
+      appBar: AppBar(title: const Text("Borrow Requests")),
       body: ListView.builder(
-        itemCount: requests.length,
+        itemCount: _requests.length,
         itemBuilder: (context, i) {
-          final r = requests[i];
+          final r = _requests[i];
           return Card(
             child: ListTile(
               title: Text(r.item),
@@ -25,16 +43,12 @@ class RequestsScreen extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.check),
-                          onPressed: () {
-                            requestsViewModel.acceptRequest(r.id);
-                          },
+                          icon: const Icon(Icons.check),
+                          onPressed: () {},
                         ),
                         IconButton(
-                          icon: Icon(Icons.close),
-                          onPressed: () {
-                            requestsViewModel.declineRequest(r.id);
-                          },
+                          icon: const Icon(Icons.close),
+                          onPressed: () {},
                         ),
                       ],
                     )

@@ -1,21 +1,20 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uborrow/auth/viewmodel/auth_viewmodel.dart';
+import 'package:uborrow/auth/viewmodel/auth_service.dart';
 import 'package:uborrow/auth/view/widgets/google_button.dart';
 import 'package:uborrow/theme/app_colors.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 
-class AuthScreen extends ConsumerStatefulWidget {
+class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  ConsumerState<AuthScreen> createState() => _AuthScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends ConsumerState<AuthScreen>
+class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late TabController _controller;
 
@@ -53,7 +52,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.lightBlue,
       body: Stack(
         children: [
           /////////// ******* BackGround Section ****** //////////
@@ -69,10 +68,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                           bottom: Radius.circular(30),
                         ),
                         gradient: LinearGradient(
-                          colors: [
-                            AppColors.gradientTopLeft,
-                            AppColors.gradientBottomRight,
-                          ],
+                          colors: [AppColors.skyBlue, AppColors.seafoamGreen],
                         ),
                       ),
                     ),
@@ -88,8 +84,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
                             colors: [
-                              AppColors.circleGradientStart,
-                              AppColors.circleGradientEnd,
+                              AppColors.royalBlue,
+                              AppColors.lightSkyBlue,
                             ],
                           ),
                         ),
@@ -115,7 +111,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               ),
               const SizedBox(height: 20),
               Container(
-                key: ValueKey(_controller.index), //it rebuilds this container solving the renderflow error when switching from signup to login tab
+                key: ValueKey(_controller.index),
+                //it rebuilds this container solving the renderflow error when switching from signup to login tab
                 height: _containerHeight,
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 30),
@@ -135,7 +132,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         children: [
                           TabBar(
                             controller: _controller,
-                            tabs: [Tab(text: "Login"), Tab(text: "SignUp")],
+                            tabs: const [
+                              Tab(text: "Login"),
+                              Tab(text: "SignUp"),
+                            ],
                           ),
                           // const Spacer(),
                           const SizedBox(height: 20),
@@ -152,13 +152,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              GoogleButton(onPressed: () async {
-                await ref.read(authViewModelProvider.notifier).signInWithGoogle();
-              }),
+              GoogleButton(
+                onPressed: () {
+                  googleLogin();
+                },
+              ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  void googleLogin() {
+    AuthService().signinWithGoogle();
   }
 }

@@ -1,42 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uborrow/auth/viewmodel/auth_viewmodel.dart';
+import 'package:uborrow/auth/viewmodel/auth_service.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authViewModelProvider);
-    final authViewModelNotifier = ref.read(authViewModelProvider.notifier);
-
-    // Listen to error changes
-    ref.listen(authViewModelProvider, (previous, next) {
-      if (next.errorMessage != null &&
-          next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
-      }
-      if (next.user != null && previous?.user == null) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    });
-
     return Column(
       children: [
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             "Email",
             style: TextStyle(
               fontWeight: FontWeight.bold,
@@ -55,18 +38,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             border: Border.all(color: AppColors.white),
           ),
           child: TextFormField(
+            controller: emailCtrl,
             style: const TextStyle(color: AppColors.white),
             decoration: const InputDecoration(
-              suffixIcon: Icon(Icons.mail, color: AppColors.inputIcon),
+              suffixIcon: Icon(Icons.mail, color: AppColors.turquoise),
               fillColor: AppColors.white,
               border: InputBorder.none,
             ),
           ),
         ),
         const Spacer(),
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             "Password",
             style: TextStyle(
               fontWeight: FontWeight.bold,
@@ -85,9 +69,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             border: Border.all(color: AppColors.white),
           ),
           child: TextFormField(
+            controller: passCtrl,
             style: const TextStyle(color: AppColors.white),
             decoration: const InputDecoration(
-              suffixIcon: Icon(Icons.lock, color: AppColors.inputIcon),
+              suffixIcon: Icon(Icons.lock, color: AppColors.turquoise),
               fillColor: AppColors.white,
               border: InputBorder.none,
             ),
@@ -95,20 +80,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const Spacer(),
         const Spacer(),
-        Container(
-          height: 40,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.primaryButton,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            "Log In",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: AppColors.white,
+        GestureDetector(
+          onTap: () {
+            login(context);
+          },
+          child: Container(
+            height: 40,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.green,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              "Log In",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppColors.white,
+              ),
             ),
           ),
         ),
@@ -116,10 +106,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const Center(
           child: Text(
             "Don't have a account REGISTER",
-            style: TextStyle(color: AppColors.linkText),
+            style: TextStyle(color: AppColors.blue),
           ),
         ),
       ],
     );
+  }
+
+  void login(BuildContext context) async {
+    final authService = AuthService();
+    try{
+      await authService.signinWithEmail(emailCtrl.text, passCtrl.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Login successful"),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+    } catch(e){
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
