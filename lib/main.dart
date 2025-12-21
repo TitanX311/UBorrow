@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uborrow/auth/auth_gate.dart';
+import 'package:uborrow/auth/view/screens/details.dart';
 import 'package:uborrow/theme/app_theme.dart';
 import 'package:uborrow/utils/constants.dart';
 

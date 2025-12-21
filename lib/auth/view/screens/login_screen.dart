@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:uborrow/auth/viewmodel/auth_service.dart';
+import 'package:uborrow/auth/repository/auth_service.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {

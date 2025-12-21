@@ -1,14 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uborrow/auth/view/screens/auth_screen.dart';
-import 'package:uborrow/auth/viewmodel/auth_service.dart';
 import 'package:uborrow/home/view/screens/main_screen.dart';
 
 class AuthGate extends StatelessWidget {
-  AuthGate({super.key});
-
-  final AuthService _auth = AuthService();
-
+  const AuthGate({super.key});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,9 +22,5 @@ class AuthGate extends StatelessWidget {
         },
       ),
     );
-  }
-
-  void signout() {
-    _auth.signout();
   }
 }

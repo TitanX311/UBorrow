@@ -1,7 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:uborrow/auth/viewmodel/auth_service.dart';
+import 'package:uborrow/auth/repository/auth_service.dart';
+import 'package:uborrow/auth/view/screens/details.dart';
 import 'package:uborrow/auth/view/widgets/google_button.dart';
 import 'package:uborrow/theme/app_colors.dart';
 import 'login_screen.dart';
@@ -154,7 +155,7 @@ class _AuthScreenState extends State<AuthScreen>
               const SizedBox(height: 20),
               GoogleButton(
                 onPressed: () {
-                  googleLogin();
+                  googleLogin(context);
                 },
               ),
             ],
@@ -164,7 +165,10 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  void googleLogin() {
+  void googleLogin(BuildContext context) {
     AuthService().signinWithGoogle();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => DetailsGoogleSignin()));
   }
 }
