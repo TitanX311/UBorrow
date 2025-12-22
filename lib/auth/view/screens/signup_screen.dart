@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:uborrow/auth/repository/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uborrow/auth/view/screens/details.dart';
+import 'package:uborrow/auth/viewmodel/auth_view_model.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
   final confirmPwCtrl = TextEditingController();
@@ -116,11 +117,19 @@ class _SignupScreenState extends State<SignupScreen> {
         GestureDetector(
           onTap: () async {
             if (passCtrl.text != confirmPwCtrl.text) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text("not same")));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Passwords do not match. Please try again.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
             } else {
-              register(context);
+              ref
+                  .read(authViewModelProvider.notifier)
+                  .registerWithEmailAndPassword(emailCtrl.text, passCtrl.text);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => DetailsRegister()),
+              );
             }
           },
           child: Container(
@@ -150,17 +159,5 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ],
     );
-  }
-
-  void register(BuildContext context) {
-    final authService = AuthService();
-    try {
-      authService.signupWithEmail(emailCtrl.text, passCtrl.text);
-      Navigator.of(context).push(MaterialPageRoute(builder: (context) => DetailsRegister()));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-      );
-    }
   }
 }

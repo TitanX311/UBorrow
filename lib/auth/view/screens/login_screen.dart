@@ -1,20 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:uborrow/auth/repository/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uborrow/auth/viewmodel/auth_view_model.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authViewModelProvider, (previous, next) {
+      if (next is AsyncError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next!.error.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      if (next is AsyncData) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login successful"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    });
     return Column(
       children: [
         const Align(
@@ -82,7 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
         const Spacer(),
         GestureDetector(
           onTap: () {
-            login(context);
+            ref.read(authViewModelProvider.notifier).loginWithEmailAndPassword(emailCtrl.text, passCtrl.text);
+            
           },
           child: Container(
             height: 40,
@@ -111,26 +131,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ],
     );
-  }
-
-  void login(BuildContext context) async {
-    final authService = AuthService();
-    try{
-      await authService.signinWithEmail(emailCtrl.text, passCtrl.text);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Login successful"),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-    } catch(e){
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }

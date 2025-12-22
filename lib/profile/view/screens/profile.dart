@@ -1,15 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uborrow/auth/view/screens/auth_screen.dart';
+import 'package:uborrow/auth/viewmodel/auth_view_model.dart';
 import 'package:uborrow/home/view/screens/notifications_screen.dart';
 import 'package:uborrow/home/view/screens/requests.dart';
 import 'package:uborrow/home/view/widgets/my_nested_scroll_view.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final user = FirebaseAuth.instance.currentUser;
 
     return MyNestedScrollView(
@@ -22,8 +24,12 @@ class ProfileScreen extends StatelessWidget {
             // ---------------- PROFILE HEADER ----------------
             CircleAvatar(
               radius: 45,
-              backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-              child: user?.photoURL == null ? const Icon(Icons.person, size: 45) : null,
+              backgroundImage: user?.photoURL != null
+                  ? NetworkImage(user!.photoURL!)
+                  : null,
+              child: user?.photoURL == null
+                  ? const Icon(Icons.person, size: 45)
+                  : null,
             ),
             const SizedBox(height: 15),
             Text(
@@ -62,7 +68,12 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.swap_horiz,
               title: "Borrow Requests",
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const RequestsScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RequestsScreen(),
+                  ),
+                );
               },
             ),
             _profileTile(
@@ -73,17 +84,19 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 20),
             // ---------------- SETTINGS SECTION ----------------
             _sectionTitle("Settings"),
+            _profileTile(icon: Icons.edit, title: "Edit Profile", onTap: () {}),
             _profileTile(
-              icon: Icons.edit,
-              title: "Edit Profile",
-              onTap: () {},
+              icon: Icons.notifications,
+              title: "Notifications",
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen(),
+                  ),
+                );
+              },
             ),
-            _profileTile(
-                icon: Icons.notifications,
-                title: "Notifications",
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen()));
-                }),
             _profileTile(icon: Icons.lock, title: "Change Password"),
             const SizedBox(height: 20),
             // ---------------- LEGAL SECTION ----------------
@@ -97,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
               title: "Logout",
               color: Colors.red,
               onTap: () async {
-                await FirebaseAuth.instance.signOut();
+                ref.read(authViewModelProvider.notifier).signOut();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const AuthScreen()),
                   (route) => false,

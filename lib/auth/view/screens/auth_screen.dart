@@ -1,21 +1,22 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:uborrow/auth/repository/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uborrow/auth/view/screens/details.dart';
 import 'package:uborrow/auth/view/widgets/google_button.dart';
+import 'package:uborrow/auth/viewmodel/auth_view_model.dart';
 import 'package:uborrow/theme/app_colors.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen>
+class _AuthScreenState extends ConsumerState<AuthScreen>
     with SingleTickerProviderStateMixin {
   late TabController _controller;
 
@@ -155,7 +156,12 @@ class _AuthScreenState extends State<AuthScreen>
               const SizedBox(height: 20),
               GoogleButton(
                 onPressed: () {
-                  googleLogin(context);
+                  ref.read(authViewModelProvider.notifier).signinWithGoogle();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => DetailsGoogleSignin(),
+                    ),
+                  );
                 },
               ),
             ],
@@ -163,12 +169,5 @@ class _AuthScreenState extends State<AuthScreen>
         ],
       ),
     );
-  }
-
-  void googleLogin(BuildContext context) {
-    AuthService().signinWithGoogle();
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => DetailsGoogleSignin()));
   }
 }
