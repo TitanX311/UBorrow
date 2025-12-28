@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -14,6 +15,7 @@ AuthRemoteRepository authRemoteRepository(Ref ref) {
 class AuthRemoteRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleAuth = GoogleSignIn.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<UserModel> signInWithEmailAndPassword(
     String email,
@@ -38,11 +40,37 @@ class AuthRemoteRepository {
     try {
       final UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
-      UserModel user = UserModel(id: userCredential.user!.uid.toString());
+      UserModel user = UserModel(id: userCredential.user!.uid.toString(), email: email);
+      _firestore.collection("users").doc(user.id).set(user.toJson());
+
       return user;
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message);
     }
+  }
+
+  Future<void> sendDetailsRegister(
+    String id,
+    String name,
+    String hostel,
+    String phoneNumber,
+  ) async {
+    await _firestore.collection("users").doc(id).set({
+      'name': name,
+      'hostel': hostel,
+      'phoneNumber': phoneNumber,
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> sendDetailsGoogle(
+    String id,
+    String hostel,
+    String phoneNumber,
+  ) async {
+    await _firestore.collection("users").doc(id).set({
+      'hostel': hostel,
+      'phoneNumber': phoneNumber,
+    }, SetOptions(merge: true));
   }
 
   Future<UserModel> signInWithGoogle() async {
@@ -69,6 +97,7 @@ class AuthRemoteRepository {
         photoURL: user.photoURL,
         email: user.email,
       );
+      _firestore.collection("users").doc(userModel.id).set(userModel.toJson());
       return userModel;
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message);

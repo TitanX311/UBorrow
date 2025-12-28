@@ -1,11 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uborrow/auth/view/screens/auth_screen.dart';
 import 'package:uborrow/auth/viewmodel/auth_view_model.dart';
 import 'package:uborrow/home/view/screens/notifications_screen.dart';
 import 'package:uborrow/home/view/screens/requests.dart';
 import 'package:uborrow/home/view/widgets/my_nested_scroll_view.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -109,12 +109,8 @@ class ProfileScreen extends ConsumerWidget {
               icon: Icons.logout,
               title: "Logout",
               color: Colors.red,
-              onTap: () async {
+              onTap: () {
                 ref.read(authViewModelProvider.notifier).signOut();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const AuthScreen()),
-                  (route) => false,
-                );
               },
             ),
           ],
