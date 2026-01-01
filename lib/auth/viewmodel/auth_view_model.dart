@@ -1,6 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/auth/model/user_model.dart';
-
 import '../repository/auth_remote_repository.dart';
 
 part 'auth_view_model.g.dart';
@@ -8,10 +8,11 @@ part 'auth_view_model.g.dart';
 @riverpod
 class AuthViewModel extends _$AuthViewModel {
   late final AuthRemoteRepository _authRemoteRepository;
+
   @override
   AsyncValue<UserModel>? build() {
     _authRemoteRepository = ref.watch(authRemoteRepositoryProvider);
-    return null;
+    return state;
   }
 
   Future<void> signinWithGoogle() async {
@@ -25,27 +26,16 @@ class AuthViewModel extends _$AuthViewModel {
     }
   }
 
-  Future<void> sendDetailsGoogle(
-    String hostel,
-    String phoneNumber,
-  ) async {
-    final user = state?.value;
-    if (user == null) {
-      throw Exception('User not logged in');
+  Future<void> sendDetailsGoogle(String hostel, String phoneNumber) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      throw Exception('User not authenticated');
     }
-    state = const AsyncLoading();
     try {
-      await _authRemoteRepository.sendDetailsGoogle(
-        user.id,
-        hostel,
-        phoneNumber,
-      );
-      state = AsyncData(user.copyWith(
-        hostel: hostel,
-        phoneNumber: phoneNumber,
-      ));
+      await _authRemoteRepository.sendDetailsGoogle(uid, hostel, phoneNumber);
     } catch (e, s) {
       state = AsyncError(e, s);
+      rethrow;
     }
   }
 
@@ -54,45 +44,44 @@ class AuthViewModel extends _$AuthViewModel {
     String hostel,
     String phoneNumber,
   ) async {
-    final user = state?.value;
-    if (user == null) {
-      throw Exception('User not logged in');
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      throw Exception("User not authenticated");
     }
-    state = const AsyncLoading();
-    try {
-      await _authRemoteRepository.sendDetailsRegister(
-        user.id,
-        name,
-        hostel,
-        phoneNumber,
-      );
-      state = AsyncData(user.copyWith(
-        name: name,
-        hostel: hostel,
-        phoneNumber: phoneNumber,
-      ));
-    } catch (e, s) {
-      state = AsyncError(e, s);
-    }
+    await _authRemoteRepository.sendDetailsRegister(
+      uid,
+      name,
+      hostel,
+      phoneNumber,
+    );
   }
 
-  Future<void> registerWithEmailAndPassword(String email, String password) async {
+  Future<UserModel?> registerWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     state = const AsyncLoading();
     try {
-      final user =
-          await _authRemoteRepository.registerWithEmailAndPassword(email, password);
+      final user = await _authRemoteRepository.registerWithEmailAndPassword(
+        email,
+        password,
+      );
       print(user);
       state = AsyncData(user);
+      return user;
     } catch (e, s) {
       state = AsyncError(e, s);
+      return null;
     }
   }
 
   Future<void> loginWithEmailAndPassword(String email, String password) async {
     state = const AsyncLoading();
     try {
-      final user =
-          await _authRemoteRepository.signInWithEmailAndPassword(email, password);
+      final user = await _authRemoteRepository.signInWithEmailAndPassword(
+        email,
+        password,
+      );
       print(user);
       state = AsyncData(user);
     } catch (e, s) {

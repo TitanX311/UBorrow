@@ -60,49 +60,47 @@ class DetailsRegister extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xffd3effb),
+        body: const Background(),
+      );
+    }
+
     final nameController = TextEditingController();
     final hostelController = TextEditingController();
     final phoneController = TextEditingController();
 
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (BuildContext context, AsyncSnapshot<User?> snapshot) {
-        if (snapshot.hasData) {
-          return Scaffold(
-            backgroundColor: const Color(0xffd3effb),
-            body: Stack(
-              children: [
-                // BackGround Section
-                const Background(),
-                // Glass Effect with Login UI
-                GlassEffect(
-                  name: true,
-                  nameController: nameController,
-                  hostelController: hostelController,
-                  phoneController: phoneController,
-                  onTap: () async {
-                    await ref
-                        .read(authViewModelProvider.notifier)
-                        .sendDetailsRegister(
-                          nameController.text,
-                          hostelController.text,
-                          phoneController.text,
-                        );
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => MainScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          );
-        } else {
-          return Scaffold(
-            backgroundColor: const Color(0xffd3effb),
-            body: const Background(),
-          );
-        }
-      },
+    return Scaffold(
+      backgroundColor: const Color(0xffd3effb),
+      body: Stack(
+        children: [
+          const Background(),
+          GlassEffect(
+            name: true,
+            nameController: nameController,
+            hostelController: hostelController,
+            phoneController: phoneController,
+            onTap: () async {
+              await ref
+                  .read(authViewModelProvider.notifier)
+                  .sendDetailsRegister(
+                    nameController.text,
+                    hostelController.text,
+                    phoneController.text,
+                  );
+
+              if (context.mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => MainScreen()),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

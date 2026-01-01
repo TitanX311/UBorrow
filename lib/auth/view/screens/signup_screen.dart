@@ -124,12 +124,24 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
               );
             } else {
-              ref
+              final user = await ref
                   .read(authViewModelProvider.notifier)
                   .registerWithEmailAndPassword(emailCtrl.text, passCtrl.text);
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => DetailsRegister()),
-              );
+
+              if (user != null && mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => DetailsRegister()),
+                );
+              } else {
+                // Show an error message if registration failed
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Registration failed. Please try again.'),
+                    ),
+                  );
+                }
+              }
             }
           },
           child: Container(

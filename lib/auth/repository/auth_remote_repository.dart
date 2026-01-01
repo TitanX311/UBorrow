@@ -40,7 +40,7 @@ class AuthRemoteRepository {
     try {
       final UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
-      UserModel user = UserModel(id: userCredential.user!.uid.toString(), email: email);
+      UserModel user = UserModel(id: userCredential.user!.uid, email: email);
       _firestore.collection("users").doc(user.id).set(user.toJson());
 
       return user;
