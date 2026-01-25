@@ -15,12 +15,12 @@ class ItemCard extends StatelessWidget {
         elevation: 2,
         child: Column(
           children: [
-            Expanded(
-              // child: Image.network(item["image"], fit: BoxFit.cover),
-              child: Placeholder(),
-            ),
+            Expanded(child: Image.network(item["image"], fit: BoxFit.cover)),
             SizedBox(height: 6),
-            Text(item["name"], style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              item["name"],
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             Text(item["hostel"], style: TextStyle(fontSize: 12)),
             SizedBox(height: 6),
           ],

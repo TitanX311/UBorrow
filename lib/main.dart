@@ -5,11 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uborrow/auth/auth_gate.dart';
 import 'package:uborrow/theme/app_theme.dart';
 import 'package:uborrow/utils/constants.dart';
+import 'package:cloudinary_url_gen/cloudinary.dart';
+import 'package:cloudinary_flutter/cloudinary_context.dart';
 
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  CloudinaryContext.cloudinary = Cloudinary.fromCloudName(cloudName: 'demo');
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -30,7 +34,7 @@ class BorrowHubApp extends StatelessWidget {
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: AuthGate()
+      home: AuthGate(),
     );
   }
 }

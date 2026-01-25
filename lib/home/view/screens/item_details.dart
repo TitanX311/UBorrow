@@ -17,7 +17,15 @@ class ItemDetailsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                Text(item["name"], style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                Text(
+                  item["name"],
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+                if (item["description"] != "" ||
+                    item["description"] != null) ...[
+                  SizedBox(height: 10),
+                  Text(item["description"]),
+                ],
                 SizedBox(height: 10),
                 Row(
                   children: [

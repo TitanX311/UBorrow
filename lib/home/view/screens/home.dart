@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uborrow/home/model/item_model.dart';
 import 'package:uborrow/home/view/screens/add_item.dart';
+import 'package:uborrow/home/view/screens/item_details.dart';
 import 'package:uborrow/home/view/screens/requests.dart';
 import 'package:uborrow/home/view/widgets/item_card.dart';
 import 'package:uborrow/home/view/widgets/my_nested_scroll_view.dart';
@@ -18,26 +20,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _notificationCount = 0;
-  final List<ItemModel> _items = [
-    ItemModel(
-      id: '1',
-      name: "Charger",
-      hostel: "Hall 3 - 219",
-      image: "https://i.imgur.com/QCNbOAo.png",
-    ),
-    ItemModel(
-      id: '2',
-      name: "Extension Board",
-      hostel: "Hall 2 - 105",
-      image: "https://i.imgur.com/aY8dFoa.png",
-    ),
-    ItemModel(
-      id: '3',
-      name: "Calculator",
-      hostel: "Hall 1 - 310",
-      image: "https://i.imgur.com/BS9xMTn.png",
-    ),
-  ];
 
   void _incrementCount() {
     setState(() {
@@ -62,40 +44,52 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Column(
-          children: [
-            Flexible(
-              child: GridView.count(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('items').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return const Center(child: Text("nothing to show"));
+            }
+
+            final items = snapshot.data!.docs;
+
+            return GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 childAspectRatio: 0.8,
-                children: _items
-                    .map(
-                      (item) => ItemCard(
-                        item: {
-                          'name': item.name,
-                          'hostel': item.hostel,
-                          'image': item.image,
-                        },
-                        onTap: () {
-                          Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          ).pushNamed(
-                            "/item",
-                            arguments: {
-                              'name': item.name,
-                              'hostel': item.hostel,
-                              'image': item.image,
-                              'description': item.description,
-                            },
-                          );
-                        },
-                      ),
-                    )
-                    .toList(),
               ),
-            ),
-          ],
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final itemDoc = items[index];
+                final item = ItemModel.fromMap(
+                  itemDoc.data() as Map<String, dynamic>,
+                );
+                final imageUrl = item.image;
+
+                return ItemCard(
+                  item: {
+                    'name': item.name,
+                    'hostel': item.hostel,
+                    'image': imageUrl,
+                  },
+                  onTap: () {
+                    Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ItemDetailsScreen(item: item.toMap()),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
         ),
       ),
       floatingActionButtonLocation: ExpandableFab.location,
@@ -105,15 +99,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         children: [
           FloatingActionButton(
-            // shape: const CircleBorder(),
             heroTag: null,
             child: const Icon(Icons.handshake_outlined),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (context) => const RequestsScreen())),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const RequestsScreen()),
+            ),
           ),
           FloatingActionButton(
-            // shape: const CircleBorder(),
             heroTag: null,
             child: const Icon(Icons.add),
             onPressed: () => Navigator.of(
