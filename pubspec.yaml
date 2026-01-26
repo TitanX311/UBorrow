@@ -46,6 +46,7 @@ dependencies:
   riverpod_annotation: ^2.6.1
   cloudinary_flutter: ^1.0.0
   cloudinary_url_gen: ^1.0.0
+  intl: ^0.18.0
 
 dev_dependencies:
   flutter_test:
