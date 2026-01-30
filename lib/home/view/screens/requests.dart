@@ -12,34 +12,17 @@ class RequestsScreen extends ConsumerStatefulWidget {
   ConsumerState<RequestsScreen> createState() => _RequestsScreenState();
 }
 
-class _RequestsScreenState extends ConsumerState<RequestsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _RequestsScreenState extends ConsumerState<RequestsScreen> {
   Future<void> _acceptRequest(String requestId, String itemId) async {
     try {
-      // Update request status
       await FirebaseFirestore.instance
-          .collection('requests')
+          .collection('item_requests')
           .doc(requestId)
           .update({
             'status': 'Accepted',
             'updatedAt': FieldValue.serverTimestamp(),
           });
 
-      // Update item availability
       if (itemId.isNotEmpty) {
         await FirebaseFirestore.instance.collection('items').doc(itemId).update(
           {'available': false},
@@ -48,14 +31,14 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
 
       _showSnackBar('Request accepted');
     } catch (e) {
-      _showSnackBar('Error accepting request: $e', isError: true);
+      _showSnackBar('Failed to accept request', isError: true);
     }
   }
 
   Future<void> _declineRequest(String requestId) async {
     try {
       await FirebaseFirestore.instance
-          .collection('requests')
+          .collection('item_requests')
           .doc(requestId)
           .update({
             'status': 'Declined',
@@ -64,22 +47,20 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
 
       _showSnackBar('Request declined');
     } catch (e) {
-      _showSnackBar('Error declining request: $e', isError: true);
+      _showSnackBar('Failed to decline request', isError: true);
     }
   }
 
   Future<void> _completeRequest(String requestId, String itemId) async {
     try {
-      // Update request status
       await FirebaseFirestore.instance
-          .collection('requests')
+          .collection('item_requests')
           .doc(requestId)
           .update({
             'status': 'Completed',
             'updatedAt': FieldValue.serverTimestamp(),
           });
 
-      // Make item available again
       if (itemId.isNotEmpty) {
         await FirebaseFirestore.instance.collection('items').doc(itemId).update(
           {'available': true},
@@ -88,17 +69,18 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
 
       _showSnackBar('Request marked as completed');
     } catch (e) {
-      _showSnackBar('Error completing request: $e', isError: true);
+      _showSnackBar('Failed to complete request', isError: true);
     }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Colors.red : Colors.green,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -108,207 +90,218 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Borrow Requests"),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: "Received", icon: Icon(Icons.inbox)),
-            Tab(text: "Sent", icon: Icon(Icons.send)),
-          ],
-        ),
+      appBar: AppBar(title: const Text("Borrow Requests"), elevation: 0),
+
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddNeedRequestSheet,
+        icon: const Icon(Icons.add),
+        label: const Text("Request Item"),
       ),
-      body: TabBarView(
-        controller: _tabController,
+
+      body: user == null
+          ? const Center(child: Text("Please sign in"))
+          : _buildRequestsSection(user.uid),
+    );
+  }
+
+  void _showAddNeedRequestSheet() {
+    final itemCtrl = TextEditingController();
+    final periodCtrl = TextEditingController();
+    final messageCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "Request an Item",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+
+              TextField(
+                controller: itemCtrl,
+                decoration: const InputDecoration(
+                  labelText: "Item name",
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: periodCtrl,
+                decoration: const InputDecoration(
+                  labelText: "Required period",
+                  hintText: "e.g. 2 days",
+                  prefixIcon: Icon(Icons.access_time),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: messageCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: "Message (optional)",
+                  prefixIcon: Icon(Icons.message_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              ElevatedButton(
+                onPressed: () async {
+                  if (itemCtrl.text.trim().isEmpty ||
+                      periodCtrl.text.trim().isEmpty) {
+                    _showSnackBar("Please fill required fields", isError: true);
+                    return;
+                  }
+
+                  Navigator.pop(context);
+                  await _createNeedRequest(
+                    itemCtrl.text.trim(),
+                    periodCtrl.text.trim(),
+                    messageCtrl.text.trim(),
+                  );
+                },
+                child: const Text("Post Request"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _createNeedRequest(
+    String itemName,
+    String period,
+    String message,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('item_requests').add({
+        'itemName': itemName,
+        'period': period,
+        'message': message,
+        'requesterId': user.uid,
+        'requesterEmail': user.email ?? '',
+        'status': 'Open', // Open → Matched → Fulfilled
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSnackBar('Request posted successfully');
+    } catch (e) {
+      _showSnackBar('Failed to post request', isError: true);
+    }
+  }
+
+  /// 🔹 Main Requests Section (similar role to AddItemScreen body)
+  Widget _buildRequestsSection(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('item_requests')
+          .where('requesterId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return _errorState(snapshot.error.toString());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _emptyState();
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            final doc = snapshot.data!.docs[index];
+            return _buildRequestCard(
+              data: doc.data() as Map<String, dynamic>,
+              requestId: doc.id,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _emptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Received Requests (requests for items you own)
-          _buildReceivedRequests(user?.uid),
-          // Sent Requests (requests you made for others' items)
-          _buildSentRequests(user?.uid),
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'No borrow requests yet',
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildReceivedRequests(String? userId) {
-    if (userId == null) {
-      return const Center(child: Text("Please sign in"));
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('requests')
-          .where('ownerId', isEqualTo: userId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('Error: ${snapshot.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'No requests received yet',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ],
-            ),
-          );
-        }
-
-        // Sort requests manually by createdAt
-        final requests = snapshot.data!.docs;
-        requests.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          final aTime = aData['createdAt'] as Timestamp?;
-          final bTime = bData['createdAt'] as Timestamp?;
-
-          if (aTime == null || bTime == null) return 0;
-          return bTime.compareTo(aTime); // Descending order
-        });
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: requests.length,
-          itemBuilder: (context, index) {
-            final requestDoc = requests[index];
-            final data = requestDoc.data() as Map<String, dynamic>;
-            final requestId = requestDoc.id;
-
-            return _buildRequestCard(
-              data: data,
-              requestId: requestId,
-              isReceived: true,
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSentRequests(String? userId) {
-    if (userId == null) {
-      return const Center(child: Text("Please sign in"));
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('requests')
-          .where('requesterId', isEqualTo: userId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('Error: ${snapshot.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.send_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'No requests sent yet',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ],
-            ),
-          );
-        }
-
-        // Sort requests manually by createdAt
-        final requests = snapshot.data!.docs;
-        requests.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          final aTime = aData['createdAt'] as Timestamp?;
-          final bTime = bData['createdAt'] as Timestamp?;
-
-          if (aTime == null || bTime == null) return 0;
-          return bTime.compareTo(aTime); // Descending order
-        });
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: requests.length,
-          itemBuilder: (context, index) {
-            final requestDoc = requests[index];
-            final data = requestDoc.data() as Map<String, dynamic>;
-            final requestId = requestDoc.id;
-
-            return _buildRequestCard(
-              data: data,
-              requestId: requestId,
-              isReceived: false,
-            );
-          },
-        );
-      },
+  Widget _errorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(error),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => setState(() {}),
+            child: const Text("Retry"),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildRequestCard({
     required Map<String, dynamic> data,
     required String requestId,
-    required bool isReceived,
   }) {
-    final cloudinaryService = ref.watch(cloudinaryServiceProvider);
-    final itemImageUrl = data['itemImage'] as String?;
+    // final cloudinaryService = ref.watch(cloudinaryServiceProvider);
+
     final status = data['status'] ?? 'Pending';
     final itemId = data['itemId'] ?? '';
+    // final itemImageUrl = data['itemImage'] as String?;
 
-    // Get thumbnail URL if image exists
-    String? thumbnailUrl;
-    if (itemImageUrl != null && itemImageUrl.isNotEmpty) {
-      thumbnailUrl = cloudinaryService.getThumbnailUrl(
-        itemImageUrl,
-        width: 80,
-        height: 80,
-      );
-    }
+    // String? thumbnailUrl;
+    // if (itemImageUrl != null && itemImageUrl.isNotEmpty) {
+    //   thumbnailUrl = cloudinaryService.getThumbnailUrl(
+    //     itemImageUrl,
+    //     width: 80,
+    //     height: 80,
+    //   );
+    // }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -319,57 +312,34 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Item Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: thumbnailUrl != null
-                  ? Image.network(
-                      thumbnailUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildDefaultImage();
-                      },
-                    )
-                  : _buildDefaultImage(),
-            ),
-            const SizedBox(width: 12),
-
-            // Request Details
+            // Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Item Name
+                  // Item name
                   Text(
                     data['itemName'] ?? 'Unknown Item',
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
 
-                  // User Info
+                  // Requester
                   Row(
                     children: [
-                      Icon(
-                        isReceived ? Icons.person : Icons.person_outline,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
+                      Icon(Icons.person, size: 16, color: Colors.grey[600]),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          isReceived
-                              ? 'From: ${data['requesterEmail'] ?? 'Unknown'}'
-                              : 'To: ${data['ownerEmail'] ?? 'Unknown'}',
+                          data['requesterEmail'] ?? 'Unknown requester',
                           style: TextStyle(
-                            color: Colors.grey[700],
                             fontSize: 13,
+                            color: Colors.grey[700],
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -377,7 +347,8 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+
+                  const SizedBox(height: 4),
 
                   // Period
                   Row(
@@ -390,47 +361,17 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
                       const SizedBox(width: 4),
                       Text(
                         data['period'] ?? 'Not specified',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                        style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 8),
 
-                  // Status & Message
+                  // Status chip + message
                   Row(
                     children: [
-                      // Status Chip
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(status),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getStatusIcon(status),
-                              size: 14,
-                              color: _getStatusTextColor(status),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _getStatusTextColor(status),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Show message if exists
+                      _statusChip(status),
                       if (data['message'] != null &&
                           (data['message'] as String).isNotEmpty)
                         Padding(
@@ -447,8 +388,8 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
                     ],
                   ),
 
-                  // Action Buttons for Received Requests
-                  if (isReceived && status == 'Pending')
+                  // Actions
+                  if (status == 'Pending')
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Row(
@@ -487,8 +428,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
                       ),
                     ),
 
-                  // Complete Button for Accepted Requests
-                  if (isReceived && status == 'Accepted')
+                  if (status == 'Accepted')
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: SizedBox(
@@ -514,6 +454,35 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
     );
   }
 
+  Widget _statusChip(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _getStatusColor(status),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getStatusIcon(status),
+            size: 14,
+            color: _getStatusTextColor(status),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            status,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _getStatusTextColor(status),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDefaultImage() {
     return Container(
       width: 80,
@@ -521,11 +490,6 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.grey[200]!, Colors.grey[300]!],
-        ),
       ),
       child: Icon(
         Icons.inventory_2_outlined,
@@ -535,7 +499,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
     );
   }
 
-  Color _getStatusColor(String? status) {
+  Color _getStatusColor(String status) {
     switch (status) {
       case 'Accepted':
         return Colors.green.shade100;
@@ -549,7 +513,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
     }
   }
 
-  Color _getStatusTextColor(String? status) {
+  Color _getStatusTextColor(String status) {
     switch (status) {
       case 'Accepted':
         return Colors.green.shade900;
@@ -563,7 +527,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
     }
   }
 
-  IconData _getStatusIcon(String? status) {
+  IconData _getStatusIcon(String status) {
     switch (status) {
       case 'Accepted':
         return Icons.check_circle;

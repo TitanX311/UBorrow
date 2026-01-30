@@ -10,7 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
 class AddItemScreen extends ConsumerStatefulWidget {
-  const AddItemScreen({super.key});
+  final String? fromRequestId;
+  const AddItemScreen({super.key, this.fromRequestId});
 
   @override
   ConsumerState<AddItemScreen> createState() => _AddItemScreenState();
@@ -299,7 +300,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
       }
 
       // Add item to Firestore
-      await FirebaseFirestore.instance.collection('items').add({
+      final itemRef = await FirebaseFirestore.instance.collection('items').add({
         'name': nameCtrl.text.trim(),
         'description': descCtrl.text.trim(),
         'hostel': hostelCtrl.text.trim(),
@@ -310,6 +311,18 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
         'available': true,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      // 🔗 If item was added in response to a need request
+      if (widget.fromRequestId != null) {
+        await FirebaseFirestore.instance
+            .collection('item_requests')
+            .doc(widget.fromRequestId)
+            .update({
+              'status': 'Fulfilled',
+              'fulfilledBy': user.uid,
+              'fulfilledItemId': itemRef.id,
+              'fulfilledAt': FieldValue.serverTimestamp(),
+            });
+      }
 
       if (mounted) {
         _showSnackBar('Item added successfully!');
