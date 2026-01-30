@@ -1,84 +1,86 @@
-class ItemModel {
-  final String id;
-  final String name;
-  final String hostel;
-  final String image;
-  final String? description;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-  //<editor-fold desc="Data Methods">
-  const ItemModel({
-    required this.id,
+class ItemModel {
+  final String? id;
+  final String name;
+  final String description;
+  final String hostel;
+  final String category;
+  final String image;
+  final String ownerId;
+  final String ownerEmail;
+  final bool available;
+  final DateTime? createdAt;
+
+  ItemModel({
+    this.id,
     required this.name,
+    required this.description,
     required this.hostel,
+    required this.category,
     required this.image,
-    this.description,
+    required this.ownerId,
+    required this.ownerEmail,
+    this.available = true,
+    this.createdAt,
   });
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ItemModel &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          name == other.name &&
-          hostel == other.hostel &&
-          image == other.image &&
-          description == other.description);
-
-  @override
-  int get hashCode =>
-      id.hashCode ^
-      name.hashCode ^
-      hostel.hashCode ^
-      image.hashCode ^
-      description.hashCode;
-
-  @override
-  String toString() {
-    return 'ItemModel{' +
-        ' id: $id,' +
-        ' name: $name,' +
-        ' hostel: $hostel,' +
-        ' image: $image,' +
-        ' description: $description,' +
-        '}';
+  // Convert Firestore document to ItemModel
+  factory ItemModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    return ItemModel(
+      id: documentId,
+      name: map['name'] ?? '',
+      description: map['description'] ?? '',
+      hostel: map['hostel'] ?? '',
+      category: map['category'] ?? 'Other',
+      image: map['image'] ?? '',
+      ownerId: map['ownerId'] ?? '',
+      ownerEmail: map['ownerEmail'] ?? '',
+      available: map['available'] ?? true,
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+    );
   }
 
+  // Convert ItemModel to Map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'hostel': hostel,
+      'category': category,
+      'image': image,
+      'ownerId': ownerId,
+      'ownerEmail': ownerEmail,
+      'available': available,
+      'createdAt': createdAt,
+    };
+  }
+
+  // Create a copy with updated fields
   ItemModel copyWith({
     String? id,
     String? name,
-    String? hostel,
-    String? image,
     String? description,
+    String? hostel,
+    String? category,
+    String? image,
+    String? ownerId,
+    String? ownerEmail,
+    bool? available,
+    DateTime? createdAt,
   }) {
     return ItemModel(
       id: id ?? this.id,
       name: name ?? this.name,
-      hostel: hostel ?? this.hostel,
-      image: image ?? this.image,
       description: description ?? this.description,
+      hostel: hostel ?? this.hostel,
+      category: category ?? this.category,
+      image: image ?? this.image,
+      ownerId: ownerId ?? this.ownerId,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
+      available: available ?? this.available,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': this.id,
-      'name': this.name,
-      'hostel': this.hostel,
-      'image': this.image,
-      'description': this.description,
-    };
-  }
-
-  factory ItemModel.fromMap(Map<String, dynamic> map) {
-    return ItemModel(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      hostel: map['hostel'] as String,
-      image: map['image'] as String,
-      description: map['description'] as String,
-    );
-  }
-
-  //</editor-fold>
 }

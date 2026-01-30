@@ -18,18 +18,22 @@ class MainScreen extends StatelessWidget {
     return PersistentTabView(
       context,
       controller: _controller,
-      screens: [const HomeScreen(), const SearchItems(), ChatScreen(), ProfileScreen()],
+      screens: [
+        const HomeScreen(),
+        // const SearchItems(),
+        ChatScreen(), ProfileScreen(),
+      ],
       items: [
         PersistentBottomNavBarItem(
           icon: const Icon(Icons.home, size: 30),
           title: 'Home',
           activeColorPrimary: AppColors.blue,
         ),
-        PersistentBottomNavBarItem(
-          icon: const Icon(Icons.search, size: 30),
-          title: 'Search',
-          activeColorPrimary: AppColors.blue,
-        ),
+        // PersistentBottomNavBarItem(
+        //   icon: const Icon(Icons.search, size: 30),
+        //   title: 'Search',
+        //   activeColorPrimary: AppColors.blue,
+        // ),
         PersistentBottomNavBarItem(
           icon: const Icon(Icons.chat, size: 30),
           title: 'Chat',
