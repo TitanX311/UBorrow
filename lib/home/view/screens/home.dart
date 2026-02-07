@@ -1,8 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-// import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uborrow/home/model/item_model.dart';
 import 'package:uborrow/home/view/screens/add_item.dart';
 import 'package:uborrow/home/view/screens/item_details.dart';
 import 'package:uborrow/home/view/screens/notifications_screen.dart';
@@ -10,19 +8,22 @@ import 'package:uborrow/home/view/screens/requests.dart';
 import 'package:uborrow/home/view/widgets/item_card.dart';
 import 'package:uborrow/home/view/widgets/my_nested_scroll_view.dart';
 import 'package:uborrow/home/view/widgets/notification_button.dart';
+import 'package:uborrow/home/viewmodel/home_view_model.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _notificationCount = 0;
   String _searchQuery = '';
   String? _selectedCategory;
+
+  final ScrollController _scrollController = ScrollController();
 
   final List<String> _categories = [
     'All',
@@ -34,6 +35,27 @@ class _HomeScreenState extends State<HomeScreen> {
     'Kitchen Items',
     'Other',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more when 200px from bottom
+      ref.read(homeViewModelProvider.notifier).loadMoreItems();
+    }
+  }
 
   void _buildPopUpMenu(BuildContext context) {
     showModalBottomSheet(
@@ -47,8 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 8),
-
-              // Drag handle (optional but feels premium)
               Container(
                 width: 40,
                 height: 4,
@@ -57,9 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               ListTile(
                 leading: const Icon(Icons.add_circle_outline),
                 title: const Text("Add"),
@@ -72,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-
               ListTile(
                 leading: const Icon(Icons.request_page_outlined),
                 title: const Text("Request"),
@@ -85,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-
               const SizedBox(height: 12),
             ],
           ),
@@ -96,7 +112,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final homeViewModel = ref.watch(homeViewModelProvider);
+    final homeViewModelNotifier = ref.read(homeViewModelProvider.notifier);
+
     return MyNestedScrollView(
+      // floatingActionButton: FloatingActionButton.extended(
+      //   backgroundColor: Colors.redAccent,
+      //   icon: const Icon(Icons.bug_report),
+      //   label: const Text('Add 50 Debug Items'),
+      //   onPressed: () {
+      //     ref
+      //         .read(homeViewModelProvider.notifier)
+      //         .generateAndUploadDebugItems();
+      //   },
+      // ),
       title: Row(
         children: [
           IconButton(
@@ -180,82 +209,73 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Items Grid
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('items')
-                    .orderBy('createdAt', descending: true)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.inventory_2_outlined,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No items available yet',
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+            child: homeViewModel.when(
+              data: (items) {
+                if (items.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No items available yet',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                  // Filter items based on search and category
-                  final items = snapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final name = (data['name'] ?? '').toLowerCase();
-                    final category = data['category'] ?? '';
+                final filteredItems = items.where((item) {
+                  final matchesSearch =
+                      _searchQuery.isEmpty ||
+                      item.name.toLowerCase().contains(_searchQuery);
+                  final matchesCategory =
+                      _selectedCategory == null ||
+                      item.category == _selectedCategory;
 
-                    final matchesSearch =
-                        _searchQuery.isEmpty || name.contains(_searchQuery);
-                    final matchesCategory =
-                        _selectedCategory == null ||
-                        category == _selectedCategory;
+                  return matchesSearch && matchesCategory;
+                }).toList();
 
-                    return matchesSearch && matchesCategory;
-                  }).toList();
+                if (filteredItems.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No items match your search',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  );
+                }
 
-                  if (items.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No items match your search',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-
-                  return GridView.builder(
+                return RefreshIndicator(
+                  onRefresh: () => homeViewModelNotifier.refresh(),
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           childAspectRatio: 0.8,
                         ),
-                    itemCount: items.length,
+                    itemCount:
+                        filteredItems.length +
+                        (homeViewModelNotifier.hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final itemDoc = items[index];
-                      final itemData = itemDoc.data() as Map<String, dynamic>;
+                      if (index == filteredItems.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
 
-                      // Create ItemModel with document ID
-                      final item = ItemModel.fromMap(
-                        itemData,
-                        documentId: itemDoc.id,
-                      );
-
-                      // Use default image if image URL is empty
+                      final item = filteredItems[index];
                       final imageUrl = item.image.isEmpty
                           ? 'https://via.placeholder.com/400x400.png?text=No+Image'
                           : item.image;
@@ -278,35 +298,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       );
                     },
-                  );
-                },
-              ),
+                  ),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(child: Text('Error: $error')),
             ),
           ),
         ],
       ),
-      // floatingActionButtonLocation: ExpandableFab.location,
-      // floatingActionButton: ExpandableFab(
-      //   openButtonBuilder: RotateFloatingActionButtonBuilder(
-      //     child: const Icon(Icons.add),
-      //   ),
-      //   children: [
-      //     FloatingActionButton(
-      //       heroTag: null,
-      //       child: const Icon(Icons.handshake_outlined),
-      //       onPressed: () => Navigator.of(context).push(
-      //         MaterialPageRoute(builder: (context) => const RequestsScreen()),
-      //       ),
-      //     ),
-      //     FloatingActionButton(
-      //       heroTag: null,
-      //       child: const Icon(Icons.add),
-      //       onPressed: () => Navigator.of(context).push(
-      //         MaterialPageRoute(builder: (context) => const AddItemScreen()),
-      //       ),
-      //     ),
-      //   ],
-      // ),
     );
   }
 }

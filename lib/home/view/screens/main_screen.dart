@@ -3,7 +3,6 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:uborrow/chats/view/screens/chat.dart';
 import 'package:uborrow/home/view/screens/home.dart';
 import 'package:uborrow/profile/view/screens/profile.dart';
-import 'package:uborrow/search/view/screens/search_items.dart';
 import 'package:uborrow/theme/app_colors.dart';
 
 class MainScreen extends StatelessWidget {
@@ -18,11 +17,7 @@ class MainScreen extends StatelessWidget {
     return PersistentTabView(
       context,
       controller: _controller,
-      screens: [
-        const HomeScreen(),
-        // const SearchItems(),
-        ChatScreen(), ProfileScreen(),
-      ],
+      screens: [const HomeScreen(), ChatScreen(), ProfileScreen()],
       items: [
         PersistentBottomNavBarItem(
           icon: const Icon(Icons.home, size: 30),
@@ -30,8 +25,8 @@ class MainScreen extends StatelessWidget {
           activeColorPrimary: AppColors.blue,
         ),
         // PersistentBottomNavBarItem(
-        //   icon: const Icon(Icons.search, size: 30),
-        //   title: 'Search',
+        //   icon: const Icon(Icons.add, size: 30),
+        //   title: 'Add',
         //   activeColorPrimary: AppColors.blue,
         // ),
         PersistentBottomNavBarItem(

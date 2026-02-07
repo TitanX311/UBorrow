@@ -25,6 +25,22 @@ class ItemModel {
     this.createdAt,
   });
 
+  factory ItemModel.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    return ItemModel(
+      id: doc.id, // ✅ ALWAYS from Firestore doc ID
+      name: data['name'],
+      description: data['description'],
+      hostel: data['hostel'],
+      category: data['category'],
+      image: data['image'],
+      ownerId: data['ownerId'],
+      ownerEmail: data['ownerEmail'],
+      available: data['available'],
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
   // Convert Firestore document to ItemModel
   factory ItemModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
     return ItemModel(
@@ -44,7 +60,7 @@ class ItemModel {
   // Convert ItemModel to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
+      // 'id': id,
       'name': name,
       'description': description,
       'hostel': hostel,

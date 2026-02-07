@@ -17,6 +17,10 @@ class AuthRemoteRepository {
   final GoogleSignIn _googleAuth = GoogleSignIn.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
+
   Future<UserModel> signInWithEmailAndPassword(
     String email,
     String password,

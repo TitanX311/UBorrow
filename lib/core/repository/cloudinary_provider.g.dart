@@ -6,7 +6,7 @@ part of 'cloudinary_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$cloudinaryConfigHash() => r'69c477510a7f6e25a1c37e25432f8a71f0d4e5c4';
+String _$cloudinaryConfigHash() => r'0d32362d2042673747f322a88bd6f1f8744eb0d7';
 
 /// Cloudinary configuration provider
 ///

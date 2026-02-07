@@ -1,16 +1,16 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:uborrow/core/repository/cloudinary_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:uborrow/home/model/item_model.dart';
+import 'package:uborrow/home/viewmodel/home_view_model.dart';
 
 class AddItemScreen extends ConsumerStatefulWidget {
   final String? fromRequestId;
+
   const AddItemScreen({super.key, this.fromRequestId});
 
   @override
@@ -251,11 +251,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   Future<void> _addItem() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showSnackBar('Please sign in to add items', isError: true);
-      return;
-    }
+    final homeVM = ref.read(homeViewModelProvider.notifier);
 
     setState(() {
       _isLoading = true;
@@ -263,66 +259,28 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     });
 
     try {
-      String? imageUrl;
-
-      // Upload image to Cloudinary if selected
-      if (_selectedImage != null) {
-        try {
-          final cloudinaryService = ref.read(cloudinaryServiceProvider);
-
-          imageUrl = await cloudinaryService.uploadImage(
-            imageFile: _selectedImage!,
-            folder: 'uborrow_items',
-            onProgress: (progress) {
-              if (mounted) {
-                setState(() {
-                  _uploadProgress = progress;
-                });
-              }
-            },
-          );
-
-          if (imageUrl == null) {
-            throw Exception('Image upload returned null');
-          }
-        } catch (e) {
-          debugPrint('Cloudinary upload error: $e');
-          // Ask user if they want to continue without image
-          final shouldContinue = await _showContinueDialog();
-          if (!shouldContinue) {
-            setState(() {
-              _isLoading = false;
-            });
-            return;
-          }
-          imageUrl = ''; // Continue without image
-        }
-      }
-
-      // Add item to Firestore
-      final itemRef = await FirebaseFirestore.instance.collection('items').add({
-        'name': nameCtrl.text.trim(),
-        'description': descCtrl.text.trim(),
-        'hostel': hostelCtrl.text.trim(),
-        'category': _selectedCategory ?? 'Other',
-        'image': imageUrl ?? '',
-        'ownerId': user.uid,
-        'ownerEmail': user.email ?? '',
-        'available': true,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      // 🔗 If item was added in response to a need request
-      if (widget.fromRequestId != null) {
-        await FirebaseFirestore.instance
-            .collection('item_requests')
-            .doc(widget.fromRequestId)
-            .update({
-              'status': 'Fulfilled',
-              'fulfilledBy': user.uid,
-              'fulfilledItemId': itemRef.id,
-              'fulfilledAt': FieldValue.serverTimestamp(),
-            });
-      }
+      final item = ItemModel(
+        name: nameCtrl.text.trim(),
+        description: descCtrl.text.trim(),
+        hostel: hostelCtrl.text.trim(),
+        category: _selectedCategory!,
+        image: '',
+        ownerId: '',
+        ownerEmail: '',
+        available: true,
+        createdAt: DateTime.now(),
+      );
+      await homeVM.addItem(
+        item: item,
+        imageFile: _selectedImage,
+        fromRequestId: widget.fromRequestId,
+        onUploadProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _uploadProgress = progress;
+          });
+        },
+      );
 
       if (mounted) {
         _showSnackBar('Item added successfully!');
