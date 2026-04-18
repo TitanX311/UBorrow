@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/auth/repository/auth_remote_repository.dart';
 import 'package:uborrow/home/model/item_model.dart';
+import 'package:uborrow/home/model/need_request_model.dart';
 import 'package:uborrow/home/repository/home_remote_repository.dart';
 
 part 'home_view_model.g.dart';
@@ -169,5 +170,19 @@ class HomeViewModel extends _$HomeViewModel {
     state = AsyncValue.data(_items);
 
     return newItem;
+  }
+
+  Future<NeedRequestModel> requestItem({
+    required String itemName,
+    required String period,
+    String? message,
+  }) async {
+    final repo = ref.read(homeRemoteRepositoryProvider);
+
+    return await repo.createNeedRequest(
+      itemName: itemName,
+      period: period,
+      message: message,
+    );
   }
 }

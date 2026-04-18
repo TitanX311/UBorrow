@@ -2,10 +2,12 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/core/repository/cloudinary_provider.dart';
 import 'package:uborrow/home/model/item_model.dart';
+import 'package:uborrow/home/model/need_request_model.dart';
 import 'package:uborrow/utils/constants.dart';
 
 import '../../core/services/notification_helper.dart';
@@ -81,7 +83,7 @@ class HomeRemoteRepository {
     return query.snapshots();
   }
 
-  // 🔹 Add item (keep as is)
+  // 🔹 Add item
   Future<ItemModel> addItem({
     required ItemModel item,
     required String ownerId,
@@ -153,7 +155,8 @@ class HomeRemoteRepository {
           }
 
           final requestData = latestRequest.data() ?? <String, dynamic>{};
-          final status = requestData['status'] as String? ?? NeedRequestStatus.open;
+          final status =
+              requestData['status'] as String? ?? NeedRequestStatus.open;
           final fulfilledBy = requestData['fulfilledBy'] as String?;
 
           if (status != NeedRequestStatus.open ||
@@ -174,27 +177,27 @@ class HomeRemoteRepository {
         rethrow;
       }
 
-       if (requestRequesterId != null &&
-           requestRequesterId.isNotEmpty &&
-           requestRequesterId != ownerId) {
-         await _sendAutomatedRequestReferenceMessage(
-           senderId: ownerId,
-           senderEmail: ownerEmail,
-           receiverId: requestRequesterId,
-           requestId: fromRequestId,
-           requestItemName: requestItemName,
-           fulfilledItemId: docRef.id,
-         );
+      // if (requestRequesterId != null &&
+      //     requestRequesterId.isNotEmpty &&
+      //     requestRequesterId != ownerId) {
+      //   await _sendAutomatedRequestReferenceMessage(
+      //     senderId: ownerId,
+      //     senderEmail: ownerEmail,
+      //     receiverId: requestRequesterId,
+      //     requestId: fromRequestId,
+      //     requestItemName: requestItemName,
+      //     fulfilledItemId: docRef.id,
+      //   );
 
-         // Send notification to requester that their need request was fulfilled
-         final notificationHelper = NotificationHelper();
-         await notificationHelper.onNeedRequestFulfilled(
-           requestId: fromRequestId,
-           itemName: requestItemName,
-           requesterId: requestRequesterId,
-           fulfilledByEmail: ownerEmail,
-         );
-       }
+      //   // Send notification to requester that their need request was fulfilled
+      //   final notificationHelper = NotificationHelper();
+      //   await notificationHelper.onNeedRequestFulfilled(
+      //     requestId: fromRequestId,
+      //     itemName: requestItemName,
+      //     requesterId: requestRequesterId,
+      //     fulfilledByEmail: ownerEmail,
+      //   );
+      // }
     }
 
     return item.copyWith(
@@ -205,13 +208,53 @@ class HomeRemoteRepository {
     );
   }
 
+  //request item
+  Future<NeedRequestModel> createNeedRequest({
+    required String itemName,
+    required String period,
+    String? message,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    try {
+      final docRef = await _needRequestRef.add({
+        'itemName': itemName,
+        'period': period,
+        'message': message,
+        'requesterId': user.uid,
+        'requesterEmail': user.email ?? '',
+        'status': NeedRequestStatus.open,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (docRef.id.isEmpty) {
+        throw Exception('Failed to post request');
+      }
+
+      final savedSnapshot = await docRef.get();
+      final data = savedSnapshot.data();
+
+      if (data == null) {
+        throw Exception('Failed to load created request');
+      }
+
+      return NeedRequestModel.fromMap(data, documentId: savedSnapshot.id);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> _sendAutomatedRequestReferenceMessage({
     required String senderId,
     required String senderEmail,
     required String receiverId,
     required String requestId,
     required String requestItemName,
-    required String fulfilledItemId,
+    String? fulfilledItemId,
   }) async {
     final timestamp = Timestamp.now();
     final participantIds = [senderId, receiverId]..sort();
@@ -228,7 +271,7 @@ class HomeRemoteRepository {
       'messageType': 'request_reference',
       'requestId': requestId,
       'requestItemName': requestItemName,
-      'fulfilledItemId': fulfilledItemId,
+      if (fulfilledItemId != null) 'fulfilledItemId': fulfilledItemId,
     };
 
     await _firestore
@@ -244,7 +287,7 @@ class HomeRemoteRepository {
       'lastMessageSenderId': senderId,
       'lastMessageType': payload['messageType'],
       'lastRequestId': requestId,
-      'lastFulfilledItemId': fulfilledItemId,
+      if (fulfilledItemId != null) 'lastFulfilledItemId': fulfilledItemId,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -268,5 +311,67 @@ class HomeRemoteRepository {
 
     await batch.commit();
     return savedItems;
+  }
+
+  Future<void> handleIHaveThis({required String requestId}) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not logged in');
+    }
+
+    String? requesterId;
+    String requestItemName = 'Unknown item';
+
+    await _firestore.runTransaction((transaction) async {
+      final requestRef = _needRequestRef.doc(requestId);
+      final requestDoc = await transaction.get(requestRef);
+
+      if (!requestDoc.exists) {
+        throw Exception('Request not found');
+      }
+
+      final requestData = requestDoc.data() ?? <String, dynamic>{};
+      final status = requestData['status'] as String? ?? NeedRequestStatus.open;
+      final fulfilledBy = requestData['fulfilledBy'] as String?;
+
+      requesterId = requestData['requesterId'] as String?;
+      requestItemName = requestData['itemName'] as String? ?? 'Unknown item';
+
+      if (requesterId == null || requesterId!.isEmpty) {
+        throw Exception('Invalid request');
+      }
+
+      if (requesterId == currentUser.uid) {
+        throw Exception('You cannot fulfill your own request');
+      }
+
+      if (status != NeedRequestStatus.open ||
+          (fulfilledBy != null && fulfilledBy.isNotEmpty)) {
+        throw Exception('This request has already been fulfilled');
+      }
+
+      transaction.update(requestRef, {
+        'status': NeedRequestStatus.fulfilled,
+        'fulfilledBy': currentUser.uid,
+        'fulfilledAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+
+    await _sendAutomatedRequestReferenceMessage(
+      senderId: currentUser.uid,
+      senderEmail: currentUser.email ?? '',
+      receiverId: requesterId!,
+      requestId: requestId,
+      requestItemName: requestItemName,
+    );
+
+    // final notificationHelper = NotificationHelper();
+    // await notificationHelper.onNeedRequestFulfilled(
+    //   requestId: requestId,
+    //   itemName: requestItemName,
+    //   requesterId: requesterId!,
+    //   fulfilledByEmail: currentUser.email ?? '',
+    // );
   }
 }

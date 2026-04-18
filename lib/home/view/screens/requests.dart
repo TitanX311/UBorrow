@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uborrow/home/viewmodel/home_view_model.dart';
 import 'package:uborrow/utils/constants.dart';
 
 class RequestsScreen extends ConsumerStatefulWidget {
@@ -12,6 +13,8 @@ class RequestsScreen extends ConsumerStatefulWidget {
 }
 
 class _RequestsScreenState extends ConsumerState<RequestsScreen> {
+  bool _isCreatingRequest = false;
+
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
 
@@ -22,6 +25,39 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  Future<void> _createNeedRequest(
+    String itemName,
+    String period,
+    String message,
+  ) async {
+    setState(() {
+      _isCreatingRequest = true;
+    });
+
+    try {
+      await ref
+          .read(homeViewModelProvider.notifier)
+          .requestItem(
+            itemName: itemName,
+            period: period,
+            message: message.isEmpty ? null : message,
+          );
+
+      _showSnackBar('Request posted successfully');
+    } catch (e) {
+      _showSnackBar(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingRequest = false;
+        });
+      }
+    }
   }
 
   @override
@@ -105,20 +141,25 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
               const SizedBox(height: 20),
 
               ElevatedButton(
-                onPressed: () async {
-                  if (itemCtrl.text.trim().isEmpty ||
-                      periodCtrl.text.trim().isEmpty) {
-                    _showSnackBar("Please fill required fields", isError: true);
-                    return;
-                  }
+                onPressed: _isCreatingRequest
+                    ? null
+                    : () async {
+                        if (itemCtrl.text.trim().isEmpty ||
+                            periodCtrl.text.trim().isEmpty) {
+                          _showSnackBar(
+                            "Please fill required fields",
+                            isError: true,
+                          );
+                          return;
+                        }
 
-                  Navigator.pop(context);
-                  await _createNeedRequest(
-                    itemCtrl.text.trim(),
-                    periodCtrl.text.trim(),
-                    messageCtrl.text.trim(),
-                  );
-                },
+                        Navigator.pop(context);
+                        await _createNeedRequest(
+                          itemCtrl.text.trim(),
+                          periodCtrl.text.trim(),
+                          messageCtrl.text.trim(),
+                        );
+                      },
                 child: const Text("Post Request"),
               ),
             ],
@@ -126,40 +167,6 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
         );
       },
     );
-  }
-
-  Future<void> _createNeedRequest(
-    String itemName,
-    String period,
-    String message,
-  ) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final docRef = await FirebaseFirestore.instance
-          .collection(AppCollections.needRequests)
-          .add({
-            'itemName': itemName,
-            'period': period,
-            'message': message,
-            'requesterId': user.uid,
-            'requesterEmail': user.email ?? '',
-            'status': NeedRequestStatus.open,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      // Keep this client write simple; backend trigger handles fanout notifications.
-      if (docRef.id.isEmpty) {
-        _showSnackBar('Failed to post request', isError: true);
-        return;
-      }
-
-      _showSnackBar('Request posted successfully');
-    } catch (e) {
-      _showSnackBar('Failed to post request', isError: true);
-    }
   }
 
   /// 🔹 Main Requests Section (similar role to AddItemScreen body)

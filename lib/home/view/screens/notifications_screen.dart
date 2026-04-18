@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uborrow/home/repository/home_remote_repository.dart';
 import 'package:uborrow/utils/constants.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -116,91 +117,10 @@ class _NeedRequestCard extends ConsumerWidget {
   const _NeedRequestCard({required this.data, required this.requestId});
 
   Future<void> _handleIHaveThis(BuildContext context, WidgetRef ref) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please sign in'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final requesterId = data['requesterId'] as String?;
-    final itemName = data['itemName'] as String? ?? 'Unknown item';
-
-    if (requesterId == null || requesterId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid request'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     try {
-      final firestore = FirebaseFirestore.instance;
-      
-      await firestore.runTransaction((transaction) async {
-        final requestRef = firestore
-            .collection(AppCollections.needRequests)
-            .doc(requestId);
-        
-        final requestDoc = await transaction.get(requestRef);
-        
-        if (!requestDoc.exists) {
-          throw Exception('Request not found');
-        }
-
-        final requestData = requestDoc.data() ?? <String, dynamic>{};
-        final status = requestData['status'] as String? ?? NeedRequestStatus.open;
-        final fulfilledBy = requestData['fulfilledBy'] as String?;
-
-        if (status != NeedRequestStatus.open ||
-            (fulfilledBy != null && fulfilledBy.isNotEmpty)) {
-          throw Exception('This request has already been fulfilled');
-        }
-
-        transaction.update(requestRef, {
-          'status': NeedRequestStatus.fulfilled,
-          'fulfilledBy': currentUser.uid,
-          'fulfilledAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      });
-
-      final participantIds = [currentUser.uid, requesterId]..sort();
-      final chatRoomId = participantIds.join('_');
-
-      final timestamp = Timestamp.now();
-      await firestore
-          .collection('chat_rooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .add({
-        'senderId': currentUser.uid,
-        'senderEmail': currentUser.email ?? '',
-        'receiverId': requesterId,
-        'message': 'I have this',
-        'timestamp': timestamp,
-        'isRead': false,
-        'isAutomated': true,
-        'messageType': 'request_reference',
-        'requestId': requestId,
-        'requestItemName': itemName,
-      });
-
-      await firestore.collection('chat_rooms').doc(chatRoomId).set({
-        'participants': participantIds,
-        'lastMessage': 'I have this',
-        'lastMessageTime': timestamp,
-        'lastMessageSenderId': currentUser.uid,
-        'lastMessageType': 'request_reference',
-        'lastRequestId': requestId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await ref
+          .read(homeRemoteRepositoryProvider)
+          .handleIHaveThis(requestId: requestId);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +134,7 @@ class _NeedRequestCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
             backgroundColor: Colors.red,
           ),
         );
@@ -315,4 +235,3 @@ class _NeedRequestCard extends ConsumerWidget {
     );
   }
 }
-
