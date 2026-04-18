@@ -1,0 +1,162 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isParticipant(chatRoomId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/chat_rooms/$(chatRoomId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(chatRoomId)).data.participants;
+    }
+
+    function isAllowedMessageType(messageType) {
+      return messageType in [
+        'i_have_this',
+        'is_available',
+        'when_collect',
+        'where_meet',
+        'meeting_time',
+        'thanks',
+        'share_contact',
+        'request_reference',
+        'borrow_request'
+      ];
+    }
+
+    function hasAllowedMessageKeys() {
+      return request.resource.data.keys().hasOnly([
+        'senderId',
+        'senderEmail',
+        'receiverId',
+        'message',
+        'messageType',
+        'timestamp',
+        'isRead',
+        'isAutomated',
+        'requestId',
+        'requestItemName',
+        'fulfilledItemId',
+        'meetingAt',
+        'meetingNote',
+        'sharedEmail',
+        'sharedPhone',
+        'itemName'
+      ]);
+    }
+
+    function hasCommonMessageShape() {
+      return request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.senderEmail is string &&
+        request.resource.data.receiverId is string &&
+        request.resource.data.message is string &&
+        request.resource.data.messageType is string &&
+        request.resource.data.timestamp is timestamp &&
+        request.resource.data.isRead == false &&
+        request.resource.data.isAutomated is bool;
+    }
+
+    function isPresetMessage() {
+      return request.resource.data.messageType in [
+        'i_have_this',
+        'is_available',
+        'when_collect',
+        'where_meet',
+        'thanks'
+      ] &&
+      !('requestId' in request.resource.data) &&
+      !('requestItemName' in request.resource.data) &&
+      !('fulfilledItemId' in request.resource.data) &&
+      !('meetingAt' in request.resource.data) &&
+      !('meetingNote' in request.resource.data) &&
+      !('sharedEmail' in request.resource.data) &&
+      !('sharedPhone' in request.resource.data);
+    }
+
+    function isMeetingTimeMessage() {
+      return request.resource.data.messageType == 'meeting_time' &&
+        request.resource.data.meetingAt is timestamp &&
+        (!('meetingNote' in request.resource.data) || request.resource.data.meetingNote is string) &&
+        !('requestId' in request.resource.data) &&
+        !('requestItemName' in request.resource.data) &&
+        !('fulfilledItemId' in request.resource.data) &&
+        !('sharedEmail' in request.resource.data) &&
+        !('sharedPhone' in request.resource.data);
+    }
+
+    function isContactShareMessage() {
+      return request.resource.data.messageType == 'share_contact' &&
+        (
+          (('sharedEmail' in request.resource.data) && request.resource.data.sharedEmail is string) ||
+          (('sharedPhone' in request.resource.data) && request.resource.data.sharedPhone is string)
+        ) &&
+        !('requestId' in request.resource.data) &&
+        !('requestItemName' in request.resource.data) &&
+        !('fulfilledItemId' in request.resource.data) &&
+        !('meetingAt' in request.resource.data) &&
+        !('meetingNote' in request.resource.data);
+    }
+
+    function isSystemReferenceMessage() {
+      return (
+        request.resource.data.messageType == 'request_reference' &&
+        request.resource.data.requestId is string &&
+        request.resource.data.requestItemName is string &&
+        (!('fulfilledItemId' in request.resource.data) || request.resource.data.fulfilledItemId is string)
+      ) || (
+        request.resource.data.messageType == 'borrow_request' &&
+        (!('itemName' in request.resource.data) || request.resource.data.itemName is string)
+      );
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /items/{itemId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /borrow_requests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /need_requests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /chat_rooms/{chatRoomId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+
+      allow create, update: if isSignedIn() &&
+        request.resource.data.participants is list &&
+        request.resource.data.participants.size() == 2 &&
+        request.auth.uid in request.resource.data.participants;
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isParticipant(chatRoomId);
+
+        allow create: if isParticipant(chatRoomId) &&
+          hasAllowedMessageKeys() &&
+          hasCommonMessageShape() &&
+          isAllowedMessageType(request.resource.data.messageType) &&
+          (
+            isPresetMessage() ||
+            isMeetingTimeMessage() ||
+            isContactShareMessage() ||
+            isSystemReferenceMessage()
+          );
+
+        allow update: if isParticipant(chatRoomId) &&
+          resource.data.receiverId == request.auth.uid &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['isRead']) &&
+          request.resource.data.isRead is bool;
+
+        allow delete: if isParticipant(chatRoomId) && resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}

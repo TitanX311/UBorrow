@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/chats/model/message.dart';
@@ -14,11 +13,18 @@ ChatService chatService(ChatServiceRef ref) {
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   User? getCurrentUser() {
     return _auth.currentUser;
   }
+
+  static const Map<String, String> presetLabels = {
+    ChatMessageType.iHaveThis: 'I have this',
+    ChatMessageType.isAvailable: 'Is this available?',
+    ChatMessageType.whenCollect: 'When can I collect it?',
+    ChatMessageType.whereMeet: 'Where can we meet?',
+    ChatMessageType.thanks: 'Thank you',
+  };
 
   Stream<List<Map<String, dynamic>>> getUserStream() {
     return _firestore.collection('users').snapshots().map((snapshot) {
@@ -34,94 +40,183 @@ class ChatService {
   Stream<List<Map<String, dynamic>>> getUsersWithLastMessage() {
     final currentUserId = getCurrentUser()!.uid;
 
-    return _firestore.collection('users').snapshots().asyncMap((
-      snapshot,
-    ) async {
-      List<Map<String, dynamic>> usersWithMessages = [];
+    return _firestore
+        .collection('chat_rooms')
+        .where('participants', arrayContains: currentUserId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<Map<String, dynamic>> usersWithMessages = [];
 
-      for (var doc in snapshot.docs) {
-        if (doc.id == currentUserId) continue;
+          for (final roomDoc in snapshot.docs) {
+            final roomData = roomDoc.data();
+            final participants =
+                (roomData['participants'] as List<dynamic>? ?? [])
+                    .map((e) => e.toString())
+                    .toList();
 
-        final user = doc.data();
-        user['uid'] = doc.id;
+            if (!participants.contains(currentUserId)) {
+              continue;
+            }
 
-        // Get last message for this chat
-        List<String> ids = [currentUserId, doc.id];
-        ids.sort();
-        String chatRoomId = ids.join('_');
+            final otherUserId = participants.firstWhere(
+              (id) => id != currentUserId,
+              orElse: () => '',
+            );
 
-        final lastMessageSnapshot = await _firestore
-            .collection('chat_rooms')
-            .doc(chatRoomId)
-            .collection('messages')
-            .orderBy('timestamp', descending: true)
-            .limit(1)
-            .get();
+            if (otherUserId.isEmpty) {
+              continue;
+            }
 
-        if (lastMessageSnapshot.docs.isNotEmpty) {
-          final lastMessage = lastMessageSnapshot.docs.first.data();
-          user['lastMessage'] = lastMessage['message'];
-          user['lastMessageTime'] = lastMessage['timestamp'];
-          user['unreadCount'] = await getUnreadCount(currentUserId, doc.id);
-        } else {
-          user['lastMessage'] = null;
-          user['lastMessageTime'] = null;
-          user['unreadCount'] = 0;
-        }
+            final userSnapshot = await _firestore
+                .collection('users')
+                .doc(otherUserId)
+                .get();
 
-        usersWithMessages.add(user);
-      }
+            final user = userSnapshot.data() ?? <String, dynamic>{};
+            user['uid'] = otherUserId;
+            user['lastMessage'] = roomData['lastMessage'];
+            user['lastMessageTime'] = roomData['lastMessageTime'];
+            user['unreadCount'] = await getUnreadCount(
+              currentUserId,
+              otherUserId,
+            );
 
-      // Sort by last message time
-      usersWithMessages.sort((a, b) {
-        if (a['lastMessageTime'] == null && b['lastMessageTime'] == null)
-          return 0;
-        if (a['lastMessageTime'] == null) return 1;
-        if (b['lastMessageTime'] == null) return -1;
-        return (b['lastMessageTime'] as Timestamp).compareTo(
-          a['lastMessageTime'] as Timestamp,
-        );
-      });
+            usersWithMessages.add(user);
+          }
 
-      return usersWithMessages;
-    });
+          // Sort by last message time
+          usersWithMessages.sort((a, b) {
+            if (a['lastMessageTime'] == null && b['lastMessageTime'] == null)
+              return 0;
+            if (a['lastMessageTime'] == null) return 1;
+            if (b['lastMessageTime'] == null) return -1;
+            return (b['lastMessageTime'] as Timestamp).compareTo(
+              a['lastMessageTime'] as Timestamp,
+            );
+          });
+
+          return usersWithMessages;
+        });
   }
 
   Future<void> sendMessage(String receiverId, String message) async {
-    final String currentUserId = getCurrentUser()!.uid;
-    final String? currentUserEmail = getCurrentUser()!.email;
-    final Timestamp timestamp = Timestamp.now();
+    throw Exception('Free-text messages are disabled');
+  }
 
-    Message newMessage = Message(
+  Future<void> sendPresetMessage({
+    required String receiverId,
+    required String messageType,
+  }) async {
+    if (!presetLabels.containsKey(messageType)) {
+      throw Exception('Invalid preset message');
+    }
+
+    final text = presetLabels[messageType]!;
+    final now = Timestamp.now();
+    final currentUserId = getCurrentUser()!.uid;
+    final currentUserEmail = getCurrentUser()!.email ?? '';
+
+    final newMessage = Message(
       senderId: currentUserId,
-      senderEmail: currentUserEmail!,
+      senderEmail: currentUserEmail,
       receiverId: receiverId,
-      message: message,
-      timestamp: timestamp,
+      message: text,
+      messageType: messageType,
+      timestamp: now,
       isRead: false,
     );
 
-    List<String> ids = [currentUserId, receiverId];
-    ids.sort();
-    String chatRoomId = ids.join('_');
+    await _sendMessageRecord(newMessage);
+  }
 
-    // Add message to Firestore
+  Future<void> sendMeetingTimeMessage({
+    required String receiverId,
+    required DateTime meetingAt,
+    String? meetingNote,
+  }) async {
+    final now = Timestamp.now();
+    final currentUserId = getCurrentUser()!.uid;
+    final currentUserEmail = getCurrentUser()!.email ?? '';
+
+    final newMessage = Message(
+      senderId: currentUserId,
+      senderEmail: currentUserEmail,
+      receiverId: receiverId,
+      message: 'Proposed meeting time',
+      messageType: ChatMessageType.meetingTime,
+      timestamp: now,
+      isRead: false,
+      meetingAt: Timestamp.fromDate(meetingAt),
+      meetingNote: meetingNote?.trim().isEmpty == true ? null : meetingNote,
+    );
+
+    await _sendMessageRecord(newMessage, lastMessageOverride: 'Meeting time');
+  }
+
+  Future<void> sendContactShareMessage({required String receiverId}) async {
+    final now = Timestamp.now();
+    final currentUserId = getCurrentUser()!.uid;
+    final currentUserEmail = getCurrentUser()!.email ?? '';
+    final contact = await _resolveContactSnapshot(currentUserId);
+
+    if ((contact['email']?.isEmpty ?? true) &&
+        (contact['phone']?.isEmpty ?? true)) {
+      throw Exception('No contact details available to share');
+    }
+
+    final newMessage = Message(
+      senderId: currentUserId,
+      senderEmail: currentUserEmail,
+      receiverId: receiverId,
+      message: 'Shared contact details',
+      messageType: ChatMessageType.shareContact,
+      timestamp: now,
+      isRead: false,
+      sharedEmail: contact['email'],
+      sharedPhone: contact['phone'],
+    );
+
+    await _sendMessageRecord(newMessage, lastMessageOverride: 'Contact shared');
+  }
+
+  Future<Map<String, String?>> _resolveContactSnapshot(String userId) async {
+    final userDoc = await _firestore.collection('users').doc(userId).get();
+    final data = userDoc.data() ?? <String, dynamic>{};
+
+    final email = ((data['email'] as String?) ?? getCurrentUser()!.email ?? '')
+        .trim();
+    final phone = ((data['phoneNumber'] as String?) ?? '').trim();
+
+    return {
+      'email': email.isEmpty ? null : email,
+      'phone': phone.isEmpty ? null : phone,
+    };
+  }
+
+  Future<void> _sendMessageRecord(
+    Message message, {
+    String? lastMessageOverride,
+  }) async {
+    final ids = [message.senderId, message.receiverId]..sort();
+    final chatRoomId = ids.join('_');
+
+    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
+      'participants': ids,
+      'lastMessage': lastMessageOverride ?? message.message,
+      'lastMessageTime': message.timestamp,
+      'lastMessageSenderId': message.senderId,
+      'lastMessageType': message.messageType,
+      if (message.requestId != null) 'lastRequestId': message.requestId,
+      if (message.fulfilledItemId != null)
+        'lastFulfilledItemId': message.fulfilledItemId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
     await _firestore
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
-        .add(newMessage.toMap());
-
-    // Update chat room metadata
-    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
-      'participants': ids,
-      'lastMessage': message,
-      'lastMessageTime': timestamp,
-      'lastMessageSenderId': currentUserId,
-      'lastMessageType': 'text',
-    }, SetOptions(merge: true));
-
-    // Notifications are sent by backend onNewMessageCreated trigger.
+        .add(message.toMap());
   }
 
   Future<void> sendRequestReferenceMessage({
@@ -140,34 +235,16 @@ class ChatService {
       senderEmail: currentUserEmail ?? '',
       receiverId: receiverId,
       message: text,
+      messageType: ChatMessageType.requestReference,
       timestamp: timestamp,
       isRead: false,
       isAutomated: true,
-      messageType: 'request_reference',
       requestId: requestId,
       requestItemName: requestItemName,
       fulfilledItemId: fulfilledItemId,
     );
 
-    List<String> ids = [currentUserId, receiverId];
-    ids.sort();
-    String chatRoomId = ids.join('_');
-
-    await _firestore
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .add(message.toMap());
-
-    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
-      'participants': ids,
-      'lastMessage': text,
-      'lastMessageTime': timestamp,
-      'lastMessageSenderId': currentUserId,
-      'lastMessageType': 'request_reference',
-      'lastRequestId': requestId,
-      'lastFulfilledItemId': fulfilledItemId,
-    }, SetOptions(merge: true));
+    await _sendMessageRecord(message);
   }
 
   Stream<QuerySnapshot> getMessages(String userId, String otherUserId) {
@@ -188,8 +265,28 @@ class ChatService {
     final currentUser = _auth.currentUser;
     if (currentUser == null || currentUser.uid != senderId) return;
 
-    final callable = _functions.httpsCallable('markMessagesAsRead');
-    await callable.call({'otherUserId': receiverId});
+    List<String> ids = [senderId, receiverId];
+    ids.sort();
+    String chatRoomId = ids.join('_');
+
+    final unreadSnapshot = await _firestore
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .where('senderId', isEqualTo: receiverId)
+        .where('receiverId', isEqualTo: senderId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    if (unreadSnapshot.docs.isEmpty) {
+      return;
+    }
+
+    final batch = _firestore.batch();
+    for (final doc in unreadSnapshot.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
   }
 
   // Get unread message count

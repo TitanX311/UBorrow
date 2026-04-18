@@ -100,7 +100,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start a conversation with someone!',
+                    'When someone taps "I have this", chats will appear here.',
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
                   ),
                 ],
@@ -170,101 +170,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             },
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Navigate to new chat or contacts screen
-          _showNewChatDialog(context);
-        },
-        child: const Icon(Icons.edit),
-      ),
-    );
-  }
-
-  void _showNewChatDialog(BuildContext context) {
-    final chatService = ref.read(chatServiceProvider);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'New Chat',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: StreamBuilder(
-                stream: chatService.getUserStream(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final users = snapshot.data!
-                      .where(
-                        (userData) =>
-                            userData['email'] !=
-                            chatService.getCurrentUser()!.email,
-                      )
-                      .toList();
-
-                  return ListView.builder(
-                    controller: scrollController,
-                    itemCount: users.length,
-                    itemBuilder: (context, index) {
-                      final userData = users[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(userData['name'][0].toUpperCase()),
-                        ),
-                        title: Text(userData['name']),
-                        subtitle: Text(userData['email']),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => InBox(
-                                receiverEmail: userData['email'],
-                                receiverId: userData['uid'],
-                                receiverName: userData['name'],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

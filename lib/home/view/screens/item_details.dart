@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:uborrow/home/model/borrow_request_model.dart';
 import 'package:uborrow/utils/constants.dart';
@@ -16,7 +16,6 @@ class ItemDetailsScreen extends StatefulWidget {
 class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
   final _periodController = TextEditingController();
   final _messageController = TextEditingController();
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   bool _isLoading = false;
 
   @override
@@ -71,10 +70,17 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
         period: period,
         message: _messageController.text.trim(),
         status: BorrowRequestStatus.pending,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
-      final callable = _functions.httpsCallable('createBorrowRequest');
-      await callable.call({...request.toMap()});
+      await FirebaseFirestore.instance
+          .collection(AppCollections.borrowRequests)
+          .add({
+            ...request.toMap(),
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       _showSnackBar('Borrow request sent successfully!');
       Navigator.of(context).pop();

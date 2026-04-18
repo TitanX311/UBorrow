@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 class PushNotificationService {
   static final PushNotificationService _instance =
@@ -16,7 +15,6 @@ class PushNotificationService {
   PushNotificationService._internal();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   late FlutterLocalNotificationsPlugin _localNotifications;
 
   // Callback for when notification is tapped
@@ -95,7 +93,7 @@ class PushNotificationService {
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (token != null && currentUser != null) {
-        await _saveFcmTokenViaCallable(token);
+        await _saveFcmTokenToFirestore(token);
 
         if (kDebugMode) {
           print('FCM Token saved: $token');
@@ -104,7 +102,7 @@ class PushNotificationService {
 
       // Listen for token refresh
       _firebaseMessaging.onTokenRefresh.listen((newToken) {
-        _saveFcmTokenViaCallable(newToken);
+        _saveFcmTokenToFirestore(newToken);
       });
     } catch (e) {
       if (kDebugMode) {
@@ -113,12 +111,14 @@ class PushNotificationService {
     }
   }
 
-  Future<void> _saveFcmTokenViaCallable(String token) async {
+  Future<void> _saveFcmTokenToFirestore(String token) async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        final callable = _functions.httpsCallable('saveFcmToken');
-        await callable.call({'token': token});
+        await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
+          'fcmToken': token,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
     } catch (e) {
       if (kDebugMode) {
