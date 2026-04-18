@@ -306,29 +306,6 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     }
   }
 
-  Future<bool> _showContinueDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Image Upload Failed'),
-        content: const Text(
-          'Failed to upload image. Would you like to continue adding the item without an image?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

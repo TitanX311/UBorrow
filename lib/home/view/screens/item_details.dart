@@ -1,6 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:uborrow/home/model/borrow_request_model.dart';
+import 'package:uborrow/utils/constants.dart';
 
 class ItemDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -14,6 +16,7 @@ class ItemDetailsScreen extends StatefulWidget {
 class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
   final _periodController = TextEditingController();
   final _messageController = TextEditingController();
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   bool _isLoading = false;
 
   @override
@@ -47,22 +50,33 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     });
 
     try {
-      await FirebaseFirestore.instance.collection('requests').add({
-        'itemId': widget.item['id'] ?? '',
-        'itemName': widget.item['name'] ?? 'Unknown Item',
-        'itemImage': widget.item['image'] ?? '',
-        'ownerId': widget.item['ownerId'] ?? '',
-        'ownerEmail': widget.item['ownerEmail'] ?? '',
-        'requesterId': user.uid,
-        'requesterEmail': user.email ?? '',
-        'period': period,
-        'message': _messageController.text.trim(),
-        'status': 'Pending',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      final ownerId = widget.item['ownerId'] as String? ?? '';
+      final itemId = widget.item['id'] as String? ?? '';
+      final itemName = widget.item['name'] as String? ?? 'Unknown Item';
+      final ownerEmail = widget.item['ownerEmail'] as String? ?? '';
 
-      _showSnackBar('Request sent successfully!');
+      if (ownerId.isEmpty) {
+        throw Exception('Item owner not found');
+      }
+
+      final request = BorrowRequestModel(
+        id: '',
+        itemId: itemId,
+        itemName: itemName,
+        itemImage: widget.item['image'] ?? '',
+        ownerId: ownerId,
+        ownerEmail: ownerEmail,
+        requesterId: user.uid,
+        requesterEmail: user.email ?? '',
+        period: period,
+        message: _messageController.text.trim(),
+        status: BorrowRequestStatus.pending,
+      );
+
+      final callable = _functions.httpsCallable('createBorrowRequest');
+      await callable.call({...request.toMap()});
+
+      _showSnackBar('Borrow request sent successfully!');
       Navigator.of(context).pop();
     } catch (e) {
       _showSnackBar('Error sending request: $e', isError: true);

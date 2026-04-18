@@ -12,6 +12,10 @@
     <!-- For Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+
+    <!-- Notification permissions -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="uborrow"
         android:name="${applicationName}"
@@ -48,6 +52,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+<!--        <meta-data-->
+<!--            android:name="firebase_messaging_auto_init_enabled"-->
+<!--            android:value="false" />-->
+<!--        <meta-data-->
+<!--            android:name="firebase_analytics_collection_enabled"-->
+<!--            android:value="false" />-->
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/chats/model/message.dart';
@@ -13,6 +14,7 @@ ChatService chatService(ChatServiceRef ref) {
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   User? getCurrentUser() {
     return _auth.currentUser;
@@ -96,6 +98,7 @@ class ChatService {
       receiverId: receiverId,
       message: message,
       timestamp: timestamp,
+      isRead: false,
     );
 
     List<String> ids = [currentUserId, receiverId];
@@ -115,6 +118,55 @@ class ChatService {
       'lastMessage': message,
       'lastMessageTime': timestamp,
       'lastMessageSenderId': currentUserId,
+      'lastMessageType': 'text',
+    }, SetOptions(merge: true));
+
+    // Notifications are sent by backend onNewMessageCreated trigger.
+  }
+
+  Future<void> sendRequestReferenceMessage({
+    required String receiverId,
+    required String requestId,
+    required String requestItemName,
+    required String fulfilledItemId,
+    String text = 'I have this',
+  }) async {
+    final String currentUserId = getCurrentUser()!.uid;
+    final String? currentUserEmail = getCurrentUser()!.email;
+    final Timestamp timestamp = Timestamp.now();
+
+    final message = Message(
+      senderId: currentUserId,
+      senderEmail: currentUserEmail ?? '',
+      receiverId: receiverId,
+      message: text,
+      timestamp: timestamp,
+      isRead: false,
+      isAutomated: true,
+      messageType: 'request_reference',
+      requestId: requestId,
+      requestItemName: requestItemName,
+      fulfilledItemId: fulfilledItemId,
+    );
+
+    List<String> ids = [currentUserId, receiverId];
+    ids.sort();
+    String chatRoomId = ids.join('_');
+
+    await _firestore
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .add(message.toMap());
+
+    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
+      'participants': ids,
+      'lastMessage': text,
+      'lastMessageTime': timestamp,
+      'lastMessageSenderId': currentUserId,
+      'lastMessageType': 'request_reference',
+      'lastRequestId': requestId,
+      'lastFulfilledItemId': fulfilledItemId,
     }, SetOptions(merge: true));
   }
 
@@ -133,21 +185,11 @@ class ChatService {
 
   // Mark messages as read
   Future<void> markMessagesAsRead(String senderId, String receiverId) async {
-    List<String> ids = [senderId, receiverId];
-    ids.sort();
-    String chatRoomId = ids.join('_');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.uid != senderId) return;
 
-    final messages = await _firestore
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .where('senderId', isEqualTo: receiverId)
-        .where('isRead', isEqualTo: false)
-        .get();
-
-    for (var doc in messages.docs) {
-      await doc.reference.update({'isRead': true});
-    }
+    final callable = _functions.httpsCallable('markMessagesAsRead');
+    await callable.call({'otherUserId': receiverId});
   }
 
   // Get unread message count

@@ -1,10 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uborrow/home/view/screens/main_screen.dart';
+import 'package:uborrow/auth/auth_gate.dart';
 import 'package:uborrow/theme/app_colors.dart';
-
-import '../auth/view/screens/auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,21 +20,12 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigate() async {
     await Future.delayed(const Duration(seconds: 3));
 
-    final user = FirebaseAuth.instance.currentUser;
-
     if (!mounted) return;
 
-    if (user != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => MainScreen()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => AuthScreen()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const AuthGate()),
+    );
   }
 
   @override

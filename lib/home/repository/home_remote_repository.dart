@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/core/repository/cloudinary_provider.dart';
 import 'package:uborrow/home/model/item_model.dart';
+import 'package:uborrow/utils/constants.dart';
+
+import '../../core/services/notification_helper.dart';
 
 part 'home_remote_repository.g.dart';
 
@@ -29,9 +32,9 @@ class HomeRemoteRepository {
 
   // 🔹 Collection ref
   CollectionReference<Map<String, dynamic>> get _itemsRef =>
-      _firestore.collection('items');
-  CollectionReference<Map<String, dynamic>> get _itemRequestRef =>
-      _firestore.collection('items_requests');
+      _firestore.collection(AppCollections.items);
+  CollectionReference<Map<String, dynamic>> get _needRequestRef =>
+      _firestore.collection(AppCollections.needRequests);
 
   // 🔹 Fetch items with pagination
   Future<List<ItemModel>> fetchItems({
@@ -87,6 +90,31 @@ class HomeRemoteRepository {
     String? fromRequestId,
     void Function(double progress)? onUploadProgress,
   }) async {
+    DocumentReference<Map<String, dynamic>>? requestRef;
+    String? requestRequesterId;
+    String requestItemName = item.name;
+
+    if (fromRequestId != null) {
+      requestRef = _needRequestRef.doc(fromRequestId);
+      final requestSnapshot = await requestRef.get();
+
+      if (!requestSnapshot.exists) {
+        throw Exception('Request not found');
+      }
+
+      final requestData = requestSnapshot.data() ?? <String, dynamic>{};
+      final status = requestData['status'] as String? ?? NeedRequestStatus.open;
+      final fulfilledBy = requestData['fulfilledBy'] as String?;
+
+      if (status != NeedRequestStatus.open ||
+          (fulfilledBy != null && fulfilledBy.isNotEmpty)) {
+        throw Exception('This request has already been fulfilled');
+      }
+
+      requestRequesterId = requestData['requesterId'] as String?;
+      requestItemName = requestData['itemName'] as String? ?? item.name;
+    }
+
     String imageUrl = item.image;
 
     if (imageFile != null) {
@@ -115,13 +143,58 @@ class HomeRemoteRepository {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    if (fromRequestId != null) {
-      await _itemRequestRef.doc(fromRequestId).update({
-        'status': 'Fulfilled',
-        'fulfilledBy': ownerId,
-        'fulfilledItemId': docRef.id,
-        'fulfilledAt': FieldValue.serverTimestamp(),
-      });
+    if (fromRequestId != null && requestRef != null) {
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final latestRequest = await transaction.get(requestRef!);
+
+          if (!latestRequest.exists) {
+            throw Exception('Request not found');
+          }
+
+          final requestData = latestRequest.data() ?? <String, dynamic>{};
+          final status = requestData['status'] as String? ?? NeedRequestStatus.open;
+          final fulfilledBy = requestData['fulfilledBy'] as String?;
+
+          if (status != NeedRequestStatus.open ||
+              (fulfilledBy != null && fulfilledBy.isNotEmpty)) {
+            throw Exception('This request has already been fulfilled');
+          }
+
+          transaction.update(requestRef, {
+            'status': NeedRequestStatus.fulfilled,
+            'fulfilledBy': ownerId,
+            'fulfilledItemId': docRef.id,
+            'fulfilledAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        });
+      } catch (e) {
+        await docRef.delete();
+        rethrow;
+      }
+
+       if (requestRequesterId != null &&
+           requestRequesterId.isNotEmpty &&
+           requestRequesterId != ownerId) {
+         await _sendAutomatedRequestReferenceMessage(
+           senderId: ownerId,
+           senderEmail: ownerEmail,
+           receiverId: requestRequesterId,
+           requestId: fromRequestId,
+           requestItemName: requestItemName,
+           fulfilledItemId: docRef.id,
+         );
+
+         // Send notification to requester that their need request was fulfilled
+         final notificationHelper = NotificationHelper();
+         await notificationHelper.onNeedRequestFulfilled(
+           requestId: fromRequestId,
+           itemName: requestItemName,
+           requesterId: requestRequesterId,
+           fulfilledByEmail: ownerEmail,
+         );
+       }
     }
 
     return item.copyWith(
@@ -132,11 +205,55 @@ class HomeRemoteRepository {
     );
   }
 
+  Future<void> _sendAutomatedRequestReferenceMessage({
+    required String senderId,
+    required String senderEmail,
+    required String receiverId,
+    required String requestId,
+    required String requestItemName,
+    required String fulfilledItemId,
+  }) async {
+    final timestamp = Timestamp.now();
+    final participantIds = [senderId, receiverId]..sort();
+    final chatRoomId = participantIds.join('_');
+
+    final payload = {
+      'senderId': senderId,
+      'senderEmail': senderEmail,
+      'receiverId': receiverId,
+      'message': 'I have this',
+      'timestamp': timestamp,
+      'isRead': false,
+      'isAutomated': true,
+      'messageType': 'request_reference',
+      'requestId': requestId,
+      'requestItemName': requestItemName,
+      'fulfilledItemId': fulfilledItemId,
+    };
+
+    await _firestore
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .add(payload);
+
+    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
+      'participants': participantIds,
+      'lastMessage': payload['message'],
+      'lastMessageTime': timestamp,
+      'lastMessageSenderId': senderId,
+      'lastMessageType': payload['messageType'],
+      'lastRequestId': requestId,
+      'lastFulfilledItemId': fulfilledItemId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<List<ItemModel>> addItemsBatch({
     required List<ItemModel> items,
   }) async {
     final batch = _firestore.batch();
-    final collection = _firestore.collection('items');
+    final collection = _firestore.collection(AppCollections.items);
 
     final List<ItemModel> savedItems = [];
 

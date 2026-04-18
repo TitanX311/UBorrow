@@ -6,6 +6,12 @@ class Message {
   final String receiverId;
   final String message;
   final Timestamp timestamp;
+  final bool isRead;
+  final bool isAutomated;
+  final String? messageType;
+  final String? requestId;
+  final String? requestItemName;
+  final String? fulfilledItemId;
 
   //<editor-fold desc="Data Methods">
   const Message({
@@ -14,6 +20,12 @@ class Message {
     required this.receiverId,
     required this.message,
     required this.timestamp,
+    this.isRead = false,
+    this.isAutomated = false,
+    this.messageType,
+    this.requestId,
+    this.requestItemName,
+    this.fulfilledItemId,
   });
 
   @override
@@ -25,7 +37,13 @@ class Message {
           senderEmail == other.senderEmail &&
           receiverId == other.receiverId &&
           message == other.message &&
-          timestamp == other.timestamp);
+          timestamp == other.timestamp &&
+          isRead == other.isRead &&
+          isAutomated == other.isAutomated &&
+          messageType == other.messageType &&
+          requestId == other.requestId &&
+          requestItemName == other.requestItemName &&
+          fulfilledItemId == other.fulfilledItemId);
 
   @override
   int get hashCode =>
@@ -33,7 +51,13 @@ class Message {
       senderEmail.hashCode ^
       receiverId.hashCode ^
       message.hashCode ^
-      timestamp.hashCode;
+      timestamp.hashCode ^
+      isRead.hashCode ^
+      isAutomated.hashCode ^
+      messageType.hashCode ^
+      requestId.hashCode ^
+      requestItemName.hashCode ^
+      fulfilledItemId.hashCode;
 
   @override
   String toString() {
@@ -43,6 +67,12 @@ class Message {
         ' receiverId: $receiverId,' +
         ' message: $message,' +
         ' timestamp: $timestamp,' +
+        ' isRead: $isRead,' +
+        ' isAutomated: $isAutomated,' +
+        ' messageType: $messageType,' +
+        ' requestId: $requestId,' +
+        ' requestItemName: $requestItemName,' +
+        ' fulfilledItemId: $fulfilledItemId,' +
         '}';
   }
 
@@ -52,6 +82,12 @@ class Message {
     String? receiverId,
     String? message,
     Timestamp? timestamp,
+    bool? isRead,
+    bool? isAutomated,
+    String? messageType,
+    String? requestId,
+    String? requestItemName,
+    String? fulfilledItemId,
   }) {
     return Message(
       senderId: senderId ?? this.senderId,
@@ -59,6 +95,12 @@ class Message {
       receiverId: receiverId ?? this.receiverId,
       message: message ?? this.message,
       timestamp: timestamp ?? this.timestamp,
+      isRead: isRead ?? this.isRead,
+      isAutomated: isAutomated ?? this.isAutomated,
+      messageType: messageType ?? this.messageType,
+      requestId: requestId ?? this.requestId,
+      requestItemName: requestItemName ?? this.requestItemName,
+      fulfilledItemId: fulfilledItemId ?? this.fulfilledItemId,
     );
   }
 
@@ -69,6 +111,12 @@ class Message {
       'receiverId': this.receiverId,
       'message': this.message,
       'timestamp': this.timestamp,
+      'isRead': this.isRead,
+      'isAutomated': this.isAutomated,
+      'messageType': this.messageType,
+      'requestId': this.requestId,
+      'requestItemName': this.requestItemName,
+      'fulfilledItemId': this.fulfilledItemId,
     };
   }
 
@@ -79,6 +127,12 @@ class Message {
       receiverId: map['receiverId'] as String,
       message: map['message'] as String,
       timestamp: map['timestamp'] as Timestamp,
+      isRead: map['isRead'] as bool? ?? false,
+      isAutomated: map['isAutomated'] as bool? ?? false,
+      messageType: map['messageType'] as String?,
+      requestId: map['requestId'] as String?,
+      requestItemName: map['requestItemName'] as String?,
+      fulfilledItemId: map['fulfilledItemId'] as String?,
     );
   }
 

@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uborrow/auth/repository/auth_remote_repository.dart';
 import 'package:uborrow/home/model/item_model.dart';

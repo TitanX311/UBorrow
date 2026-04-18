@@ -24,15 +24,15 @@ class _InBoxState extends ConsumerState<InBox> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  String? _replyToMessage;
   bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-      _markMessagesAsRead();
+      if (mounted) {
+        _scrollToBottom();
+      }
     });
 
     // Typing indicator
@@ -40,24 +40,21 @@ class _InBoxState extends ConsumerState<InBox> {
   }
 
   void _onTypingChanged() {
+    if (!mounted) return;
+
     final isTyping = _messageController.text.isNotEmpty;
     if (isTyping != _isTyping) {
       _isTyping = isTyping;
-      final currentUser = ref.read(chatServiceProvider).getCurrentUser();
-      if (currentUser != null) {
-        ref
-            .read(chatServiceProvider)
-            .setTypingStatus(currentUser.uid, widget.receiverId, isTyping);
+      try {
+        final currentUser = ref.read(chatServiceProvider).getCurrentUser();
+        if (currentUser != null) {
+          ref
+              .read(chatServiceProvider)
+              .setTypingStatus(currentUser.uid, widget.receiverId, isTyping);
+        }
+      } catch (e) {
+        // Silently ignore errors when widget is disposed
       }
-    }
-  }
-
-  void _markMessagesAsRead() {
-    final currentUser = ref.read(chatServiceProvider).getCurrentUser();
-    if (currentUser != null) {
-      ref
-          .read(chatServiceProvider)
-          .markMessagesAsRead(currentUser.uid, widget.receiverId);
     }
   }
 
@@ -68,13 +65,7 @@ class _InBoxState extends ConsumerState<InBox> {
     _scrollController.dispose();
     _focusNode.dispose();
 
-    // Clear typing status
-    final currentUser = ref.read(chatServiceProvider).getCurrentUser();
-    if (currentUser != null) {
-      ref
-          .read(chatServiceProvider)
-          .setTypingStatus(currentUser.uid, widget.receiverId, false);
-    }
+    // Clear typing status without accessing ref
     super.dispose();
   }
 
@@ -93,16 +84,22 @@ class _InBoxState extends ConsumerState<InBox> {
       final message = _messageController.text;
       _messageController.clear();
 
-      await ref
-          .read(chatServiceProvider)
-          .sendMessage(widget.receiverId, message);
-
-      // Clear typing status
-      final currentUser = ref.read(chatServiceProvider).getCurrentUser();
-      if (currentUser != null) {
-        ref
+      try {
+        await ref
             .read(chatServiceProvider)
-            .setTypingStatus(currentUser.uid, widget.receiverId, false);
+            .sendMessage(widget.receiverId, message);
+
+        // Clear typing status safely
+        if (mounted) {
+          final currentUser = ref.read(chatServiceProvider).getCurrentUser();
+          if (currentUser != null) {
+            ref
+                .read(chatServiceProvider)
+                .setTypingStatus(currentUser.uid, widget.receiverId, false);
+          }
+        }
+      } catch (e) {
+        // Handle error silently or show to user
       }
       _isTyping = false;
     }
@@ -214,7 +211,24 @@ class _InBoxState extends ConsumerState<InBox> {
           .watch(chatServiceProvider)
           .getMessages(widget.receiverId, senderId),
       builder: (context, snapshot) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollToBottom();
+            // Mark messages as read when they load
+            try {
+              final currentUser = ref
+                  .read(chatServiceProvider)
+                  .getCurrentUser();
+              if (currentUser != null) {
+                ref
+                    .read(chatServiceProvider)
+                    .markMessagesAsRead(currentUser.uid, widget.receiverId);
+              }
+            } catch (e) {
+              // Silently ignore
+            }
+          }
+        });
 
         if (snapshot.hasError) {
           return const Center(child: Text("Error loading messages"));
@@ -321,73 +335,102 @@ class _InBoxState extends ConsumerState<InBox> {
 
   Widget _buildMessageItem(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final isRequestReference = data['messageType'] == 'request_reference';
+    final isBorrowRequest = data['messageType'] == 'borrow_request';
+    final requestItemName = (data['requestItemName'] as String?)?.trim();
+    final itemName = (data['itemName'] as String?)?.trim();
     bool isCurrentUser =
         data['senderId'] ==
         ref.watch(chatServiceProvider).getCurrentUser()!.uid;
 
-    var alignment = isCurrentUser
-        ? CrossAxisAlignment.end
-        : CrossAxisAlignment.start;
     var bubbleColor = isCurrentUser ? Colors.blue : Colors.grey.shade300;
     var textColor = isCurrentUser ? Colors.white : Colors.black;
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context, doc),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4.0),
-        child: Column(
-          crossAxisAlignment: alignment,
-          children: [
-            Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isCurrentUser ? 20 : 4),
-                  bottomRight: Radius.circular(isCurrentUser ? 4 : 20),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data["message"] ?? '',
-                    style: TextStyle(color: textColor, fontSize: 15),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatMessageTime(data['timestamp']),
-                        style: TextStyle(
-                          color: isCurrentUser
-                              ? Colors.white70
-                              : Colors.grey.shade600,
-                          fontSize: 11,
-                        ),
-                      ),
-                      if (isCurrentUser) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          data['isRead'] == true ? Icons.done_all : Icons.done,
-                          size: 14,
-                          color: data['isRead'] == true
-                              ? Colors.blue.shade100
-                              : Colors.white70,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+      child: Align(
+        alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 10),
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isCurrentUser ? 20 : 4),
+                bottomRight: Radius.circular(isCurrentUser ? 4 : 20),
               ),
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data["message"] ?? '',
+                  style: TextStyle(color: textColor, fontSize: 15),
+                ),
+                if (isRequestReference)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      requestItemName != null && requestItemName.isNotEmpty
+                          ? 'Request: $requestItemName'
+                          : 'Request reference attached',
+                      style: TextStyle(
+                        color: isCurrentUser
+                            ? Colors.white70
+                            : Colors.grey.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                if (isBorrowRequest)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      itemName != null && itemName.isNotEmpty
+                          ? 'Item: $itemName'
+                          : 'Borrow request attached',
+                      style: TextStyle(
+                        color: isCurrentUser
+                            ? Colors.white70
+                            : Colors.grey.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatMessageTime(data['timestamp']),
+                      style: TextStyle(
+                        color: isCurrentUser
+                            ? Colors.white70
+                            : Colors.grey.shade600,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (isCurrentUser) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        data['isRead'] == true ? Icons.done_all : Icons.done,
+                        size: 14,
+                        color: data['isRead'] == true
+                            ? Colors.blue.shade100
+                            : Colors.white70,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -2,8 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uborrow/core/repository/cloudinary_provider.dart';
-import 'package:uborrow/home/model/request_model.dart';
+import 'package:uborrow/utils/constants.dart';
 
 class RequestsScreen extends ConsumerStatefulWidget {
   const RequestsScreen({super.key});
@@ -13,66 +12,6 @@ class RequestsScreen extends ConsumerStatefulWidget {
 }
 
 class _RequestsScreenState extends ConsumerState<RequestsScreen> {
-  Future<void> _acceptRequest(String requestId, String itemId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('item_requests')
-          .doc(requestId)
-          .update({
-            'status': 'Accepted',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      if (itemId.isNotEmpty) {
-        await FirebaseFirestore.instance.collection('items').doc(itemId).update(
-          {'available': false},
-        );
-      }
-
-      _showSnackBar('Request accepted');
-    } catch (e) {
-      _showSnackBar('Failed to accept request', isError: true);
-    }
-  }
-
-  Future<void> _declineRequest(String requestId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('item_requests')
-          .doc(requestId)
-          .update({
-            'status': 'Declined',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      _showSnackBar('Request declined');
-    } catch (e) {
-      _showSnackBar('Failed to decline request', isError: true);
-    }
-  }
-
-  Future<void> _completeRequest(String requestId, String itemId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('item_requests')
-          .doc(requestId)
-          .update({
-            'status': 'Completed',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      if (itemId.isNotEmpty) {
-        await FirebaseFirestore.instance.collection('items').doc(itemId).update(
-          {'available': true},
-        );
-      }
-
-      _showSnackBar('Request marked as completed');
-    } catch (e) {
-      _showSnackBar('Failed to complete request', isError: true);
-    }
-  }
-
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
 
@@ -90,7 +29,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Borrow Requests"), elevation: 0),
+      appBar: AppBar(title: const Text("Need Requests"), elevation: 0),
 
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddNeedRequestSheet,
@@ -198,15 +137,24 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
     if (user == null) return;
 
     try {
-      await FirebaseFirestore.instance.collection('item_requests').add({
-        'itemName': itemName,
-        'period': period,
-        'message': message,
-        'requesterId': user.uid,
-        'requesterEmail': user.email ?? '',
-        'status': 'Open', // Open → Matched → Fulfilled
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final docRef = await FirebaseFirestore.instance
+          .collection(AppCollections.needRequests)
+          .add({
+            'itemName': itemName,
+            'period': period,
+            'message': message,
+            'requesterId': user.uid,
+            'requesterEmail': user.email ?? '',
+            'status': NeedRequestStatus.open,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      // Keep this client write simple; backend trigger handles fanout notifications.
+      if (docRef.id.isEmpty) {
+        _showSnackBar('Failed to post request', isError: true);
+        return;
+      }
 
       _showSnackBar('Request posted successfully');
     } catch (e) {
@@ -218,9 +166,8 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
   Widget _buildRequestsSection(String userId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('item_requests')
+          .collection(AppCollections.needRequests)
           .where('requesterId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -235,15 +182,20 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
           return _emptyState();
         }
 
+        final docs = snapshot.data!.docs.toList()
+          ..sort(
+            (a, b) => _compareByCreatedAtDescending(
+              a.data() as Map<String, dynamic>,
+              b.data() as Map<String, dynamic>,
+            ),
+          );
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
+          itemCount: docs.length,
           itemBuilder: (context, index) {
-            final doc = snapshot.data!.docs[index];
-            return _buildRequestCard(
-              data: doc.data() as Map<String, dynamic>,
-              requestId: doc.id,
-            );
+            final doc = docs[index];
+            return _buildRequestCard(data: doc.data() as Map<String, dynamic>);
           },
         );
       },
@@ -258,7 +210,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
           Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
           SizedBox(height: 16),
           Text(
-            'No borrow requests yet',
+            'No need requests yet',
             style: TextStyle(color: Colors.grey, fontSize: 16),
           ),
         ],
@@ -284,14 +236,10 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
     );
   }
 
-  Widget _buildRequestCard({
-    required Map<String, dynamic> data,
-    required String requestId,
-  }) {
+  Widget _buildRequestCard({required Map<String, dynamic> data}) {
     // final cloudinaryService = ref.watch(cloudinaryServiceProvider);
 
-    final status = data['status'] ?? 'Pending';
-    final itemId = data['itemId'] ?? '';
+    final status = data['status'] ?? NeedRequestStatus.open;
     // final itemImageUrl = data['itemImage'] as String?;
 
     // String? thumbnailUrl;
@@ -388,63 +336,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
                     ],
                   ),
 
-                  // Actions
-                  if (status == 'Pending')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  _acceptRequest(requestId, itemId),
-                              icon: const Icon(Icons.check, size: 18),
-                              label: const Text('Accept'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _declineRequest(requestId),
-                              icon: const Icon(Icons.close, size: 18),
-                              label: const Text('Decline'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
-                                side: const BorderSide(color: Colors.red),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  if (status == 'Accepted')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _completeRequest(requestId, itemId),
-                          icon: const Icon(Icons.done_all, size: 18),
-                          label: const Text('Mark as Completed'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -452,6 +344,23 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
         ),
       ),
     );
+  }
+
+  int _compareByCreatedAtDescending(
+    Map<String, dynamic> left,
+    Map<String, dynamic> right,
+  ) {
+    final leftCreatedAt = left['createdAt'];
+    final rightCreatedAt = right['createdAt'];
+
+    final leftMillis = leftCreatedAt is Timestamp
+        ? leftCreatedAt.millisecondsSinceEpoch
+        : 0;
+    final rightMillis = rightCreatedAt is Timestamp
+        ? rightCreatedAt.millisecondsSinceEpoch
+        : 0;
+
+    return rightMillis.compareTo(leftMillis);
   }
 
   Widget _statusChip(String status) {
@@ -483,31 +392,15 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
     );
   }
 
-  Widget _buildDefaultImage() {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(
-        Icons.inventory_2_outlined,
-        size: 40,
-        color: Colors.grey[400],
-      ),
-    );
-  }
-
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Accepted':
+      case NeedRequestStatus.fulfilled:
         return Colors.green.shade100;
-      case 'Declined':
+      case NeedRequestStatus.closed:
         return Colors.red.shade100;
-      case 'Completed':
+      case NeedRequestStatus.matched:
         return Colors.blue.shade100;
-      case 'Pending':
+      case NeedRequestStatus.open:
       default:
         return Colors.orange.shade100;
     }
@@ -515,13 +408,13 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
 
   Color _getStatusTextColor(String status) {
     switch (status) {
-      case 'Accepted':
+      case NeedRequestStatus.fulfilled:
         return Colors.green.shade900;
-      case 'Declined':
+      case NeedRequestStatus.closed:
         return Colors.red.shade900;
-      case 'Completed':
+      case NeedRequestStatus.matched:
         return Colors.blue.shade900;
-      case 'Pending':
+      case NeedRequestStatus.open:
       default:
         return Colors.orange.shade900;
     }
@@ -529,13 +422,13 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
 
   IconData _getStatusIcon(String status) {
     switch (status) {
-      case 'Accepted':
+      case NeedRequestStatus.fulfilled:
         return Icons.check_circle;
-      case 'Declined':
+      case NeedRequestStatus.closed:
         return Icons.cancel;
-      case 'Completed':
+      case NeedRequestStatus.matched:
         return Icons.done_all;
-      case 'Pending':
+      case NeedRequestStatus.open:
       default:
         return Icons.hourglass_empty;
     }
