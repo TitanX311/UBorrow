@@ -1,0 +1,18 @@
+services:
+  - type: cron
+    name: uborrow-notification-cron
+    runtime: python
+    plan: free
+    rootDir: server
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py --run-once
+    envVars:
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: MAX_DOCS_PER_RUN
+        value: "200"
+      - key: MAX_SENDS_PER_RUN
+        value: "100"
+      - key: POLL_INTERVAL_SECONDS
+        value: "300"

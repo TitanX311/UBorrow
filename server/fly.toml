@@ -1,0 +1,16 @@
+app = "uborrow-notification-worker"
+primary_region = "sin"
+
+[env]
+  MAX_DOCS_PER_RUN = "200"
+  MAX_SENDS_PER_RUN = "100"
+  MAX_RETRY_ATTEMPTS = "3"
+  POLL_INTERVAL_SECONDS = "300"
+
+[processes]
+  app = "python app.py"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
